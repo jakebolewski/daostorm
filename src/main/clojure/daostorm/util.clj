@@ -172,6 +172,7 @@
       [(- cur-threshold threshold) false]
       [cur-threshold true])))
 
+(comment "test local branch")
 (defn -main [& args]
   (let [ij (ij.ImageJ.)
         imp (.open (ij.io.Opener.) test-tiff)
