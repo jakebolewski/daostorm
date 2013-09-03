@@ -1,5 +1,6 @@
 package edu.mcmaster.daostorm;
 
+import com.sun.istack.internal.NotNull;
 import ij.ImageJ;
 import ij.ImagePlus;
 import ij.gui.Overlay;
@@ -9,12 +10,94 @@ import ij.process.FloatProcessor;
 import ij.process.ImageProcessor;
 
 import java.util.ArrayList;
+import java.util.Collections;
 
 public class Util {
 
+    public static void printStats(ArrayList<Peak> peaks) {
+        int[] stats = fitStats(peaks);
+        double total = (double) stats[3];
+        System.out.format("%d good:%t%d bad:%t%d unconverged:%t%d total:%n",
+                          stats[0] / total, stats[1] / total, stats[2] / total, (int) total);
+    }
+
+    public static double[] calcSxSy(double[] wxParams,
+                                    double[] wyParams,
+                                    double z)
+    {
+        assert(wxParams != null && wyParams != null);
+        assert((wxParams.length == 5) &&
+               (wxParams.length == wyParams.length));
+        double zx = (z - wxParams[1]) / wxParams[2];
+        double sx = 0.5 * wxParams[0] * Math.sqrt(1.0 + zx*zx + wxParams[3]*zx*zx*zx + wxParams[4]*zx*zx*zx*zx);
+        double zy = (z - wyParams[1]) / wyParams[2];
+        double sy = 0.5 * wyParams[0] * Math.sqrt(1.0 + zy*zy + wyParams[3]*zy*zy*zy + wyParams[4]*zy*zy*zy*zy);
+        return new double[]{sx, sy};
+    }
+
+    public static ArrayList<Peak> getConvergedPeaks(ArrayList<Peak> peaks,
+                                                    double minHeight,
+                                                    double minWidth) {
+        assert(peaks != null);
+        assert(minHeight >= 0.0 && minWidth >= 0.0);
+
+        if (peaks.size() == 0)
+            return peaks;
+
+        ArrayList<Peak> convergedPeaks = new ArrayList<Peak>();
+        minWidth *= 0.5;
+        for (Peak p : peaks) {
+            if (p.hasStatus(PeakStatus.CONVERGED) &&
+                p.getHeight() > minHeight &&
+                p.getXWidth() > minWidth &&
+                p.getYWidth() > minWidth)
+                convergedPeaks.add(p);
+        }
+        return convergedPeaks;
+    }
+
+    public static ArrayList<Peak> getGoodPeaks(ArrayList<Peak> peaks,
+                                               double minHeight,
+                                               double minWidth) {
+        assert(peaks != null);
+        assert(minHeight >= 0.0 && minWidth >= 0.0);
+
+        if (peaks.size() == 0)
+            return peaks;
+        ArrayList<Peak> goodPeaks = new ArrayList<Peak>();
+        minWidth *= 0.5;
+        for (Peak p : peaks) {
+            if (!p.hasStatus(PeakStatus.ERROR) &&
+                 p.getHeight() > minHeight &&
+                 p.getXWidth() > minWidth &&
+                 p.getYWidth() > minWidth)
+                goodPeaks.add(p);
+        }
+        return goodPeaks;
+    }
+
+    public static int[] fitStats(ArrayList<Peak> peaks) {
+        assert(peaks != null);
+        int total = peaks.size();
+        int numBad = 0;
+        int numConverged = 0;
+        int numUnconverged = 0;
+        for (Peak p : peaks) {
+            PeakStatus status = p.getStatus();
+            if (status == PeakStatus.BADPEAK)
+                numBad++;
+            else if (status == PeakStatus.CONVERGED)
+                numConverged++;
+            else if (status == PeakStatus.RUNNING)
+                numUnconverged++;
+        }
+        return new int[]{numConverged, numBad, numUnconverged, total};
+    }
+
     public static FloatProcessor subtractImageProcessors(FloatProcessor ip1,
                                                          FloatProcessor ip2) {
-         assert(ip1.getWidth() == ip2.getWidth() &&
+        assert(ip1 != null && ip2 != null);
+        assert(ip1.getWidth() == ip2.getWidth() &&
                ip1.getHeight() == ip2.getHeight());
         FloatProcessor out = (FloatProcessor) ip1.duplicate();
         for (int y=0; y < ip1.getHeight(); y++) {
@@ -27,6 +110,7 @@ public class Util {
 
     public static ImageProcessor subtractImageProcessors(ImageProcessor ip1,
                                                          ImageProcessor ip2) {
+        assert(ip1 != null && ip2 != null);
         assert(ip1.getWidth() == ip2.getWidth() &&
                ip1.getHeight() == ip2.getHeight());
         ImageProcessor out = ip1.duplicate();
@@ -40,7 +124,8 @@ public class Util {
 
     public static FloatProcessor addImageProcessors(FloatProcessor ip1,
                                                     FloatProcessor ip2) {
-         assert(ip1.getWidth() == ip2.getWidth() &&
+        assert(ip1 != null && ip2 != null);
+        assert(ip1.getWidth() == ip2.getWidth() &&
                ip1.getHeight() == ip2.getHeight());
         FloatProcessor out = (FloatProcessor) ip1.duplicate();
         for (int y=0; y < ip1.getHeight(); y++) {
@@ -53,6 +138,7 @@ public class Util {
 
     public static ImageProcessor addImageProcessors(ImageProcessor ip1,
                                                     ImageProcessor ip2) {
+        assert(ip1 != null && ip2 != null);
         assert(ip1.getWidth() == ip2.getWidth() &&
                ip1.getHeight() == ip2.getHeight());
         ImageProcessor out = ip1.duplicate();
@@ -65,6 +151,7 @@ public class Util {
     }
 
     public static void addPeakROIS(ImagePlus imp, ArrayList<Peak> peaks) {
+        assert(imp != null && peaks != null);
         Overlay overlay = new Overlay();
         for (Peak peak : peaks) {
             PointRoi pt = new PointRoi(peak.getXCenter() + 0.5,

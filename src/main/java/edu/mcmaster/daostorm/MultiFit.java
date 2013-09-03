@@ -139,6 +139,12 @@ public class MultiFit {
         return count;
     }
 
+    public double[] getResidual() {
+        double[] residual = new double[this.imageData.length];
+        getResidual(residual);
+        return residual;
+    }
+
     public void getResidual(double[] residual) {
         assert(residual.length == this.imageData.length);
         calcFit();
