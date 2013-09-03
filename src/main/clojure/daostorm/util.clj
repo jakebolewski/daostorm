@@ -1,5 +1,5 @@
 (ns daostorm.util
-  (:import [[edu.mcmaster.daostorm ]]))
+  (:import [edu.mcmaster.daostorm Util MultiFit]))
 
 (def ^:const test-tiff
   "/home/jake/STORM_DATA/comp.tif")
@@ -77,7 +77,7 @@
         img-height (.getHeight imp)
         taken (int-array (alength img-array))
         threshold 300.0
-        radius 3.0
+        radius 2.0
         background 100.0
         sigma 1.2]
   (find-local-maxima
@@ -104,18 +104,18 @@
   (.. imp getStatistics mean))
 
 (defn imp-min [^ij.ImagePlus imp]
-  (.. imp getMin))
+  (.. imp getStatistics min))
 
 (defn imp-max [^ij.ImagePlus imp]
-  (.. imp getMax))
+  (.. imp getStatistics max))
 
 (defn add-imp [imp1 imp2]
-  ;; todo
-  (.duplicate imp1))
+  (Util/addImageProcessors
+    (.getProcessor imp1) (.getProcessor imp2)))
 
 (defn sub-imp [imp1 imp2]
-  ;; todo
-  (.duplicate imp2))
+  (Util/subtractImageProcessors
+    (.getProcessor imp1) (.getProcessor imp2)))
 
 (defn add-to-imp [imp x]
   (doto imp (.add x)))
@@ -123,15 +123,14 @@
 (defn sub-from-imp [imp x]
   (doto imp (.subtract x)))
 
-(defn converged-peaks [peaks]
- ;; todo multi.getConvergedPeaks peaks 0.0 0.0)
-  peaks)
+(defn converged-peaks [multi peaks]
+  (.getConvergedPeaks multi peaks 0.0 0.0))
 
-(defn get-good-peaks [res threshold sigma]
-  res)
+(defn get-good-peaks [peaks threshold sigma]
+  (Util/getGoodPeaks peaks threshold sigma))
 
 (defn remove-close-peaks [peaks sigma neighboorhood]
-  peaks)
+  (Util/removeClosePeaks peaks sigma neighboorhood))
 
 (defn iterate-fit [fit-func fit-data]
   (let [result (fit-func (:image fit-data))
@@ -159,20 +158,84 @@
         mean-residual-bg (imp-mean residual-bg)
         residual (add-to-imp (sub-imp residual residual-bg)
                               mean-residual-bg)
-        background (mean-imp residual)
+        background (imp-mean residual)
         cutoff (+ background threshold)]
     (merge fit-data {:residual residual
                      :background background
                      :cutoff cutoff})))
 
-(defn below-threshold [fitdata]
-  (let [cur-threshold (:cur-threshold fitdata)
+(defn below-threshold [fit-data]
+  (let [cur-threshold (:cur-threshold fit-data)
         threshold (:threshold fit-data)]
     (if (> cur-threshold threshold)
       [(- cur-threshold threshold) false]
       [cur-threshold true])))
 
-(comment "test local branch")
+(defn do-fit [imp peaks tolerance max-iters z-fit?]
+  (let [num-peaks (.size peaks)
+        data (imp-to-1d-double-array imp)
+        width (.getWidth imp)
+        height (.getHeight imp)
+        multi (MultiFit. data peaks tolerance width height z-fit?)
+        num-iters (atom 0)]
+    (do
+      (.iter2D multi)
+      (loop [i 1]
+        (when (and (> (.getNumUnconverged multi))
+                   (< i max-iters))
+          (.iter2D multi)
+          (swap! num-iters inc)
+          (prn (str "Total Error: iteration " i " error: " (.getTotalError multi)))
+          (recur (inc i))))
+      (if (== @num-iters (dec max-iters))
+        (prn (str "Failed to converge in: " @num-iters " " (.getNumUnconverged multi)))
+        (prn (str "Multi-fit converged in: " @num-iters " " (.getNumUnconverged multi))))
+      [(.getResults multi)
+       (.getResidual multi)])))
+
+
+(defn ^ij.gui.PointRoi peak-to-point-color [peak color]
+  (let [x (+ (.getXCenter peak) 0.5)
+        y (+ (.getYCenter peak) 0.5)]
+    (doto (ij.gui.PointRoi. x y)
+      (.setFillColor color))))
+
+(defn ^ij.gui.Overlay peaks-update-overlay [^java.util.ArrayList maxima
+                                            ^java.util.ArrayList peaks]
+  (let [overlay (ij.gui.Overlay.)]
+    (doseq [p maxima]
+      (.add overlay (peak-to-point-color p java.awt.Color/RED)))
+    (doseq [p peaks]
+      (.add overlay (peak-to-point-color p java.awt.Color/GREEN)))
+    overlay))
+
+(defn visualize-residual [^doubles residual width height]
+  (let [_ (ij.ImageJ.)
+        float-buffer (float-array (alength residual))
+        float-proc (ij.process.FloatProcessor. width height)
+        imp (ij.ImagePlus.)]
+    (dotimes [i (alength residual)]
+      (aset-float float-buffer i (aget residual i)))
+    (.setPixels float-proc float-buffer)
+    (.setProcessor imp float-proc)
+    (.show imp)))
+
+(defn test-fitting []
+  (let [imp (load-imp test-tiff)
+        width (.getWidth imp)
+        height (.getHeight imp)
+        peaks (local-max-peaks imp)
+        [result-peaks residual] (do-fit imp peaks 1e-8 2000 false)]
+    (show-imp-overlay imp (peaks-update-overlay peaks result-peaks))
+    (visualize-residual residual width height)))
+
+
+(defn show-local-maxima [filename]
+  (let [imp (load-imp filename)
+        peaks (local-max-peaks imp)]
+    (show-imp-overlay imp (peaks-overlay peaks))))
+
+
 (defn -main [& args]
   (let [ij (ij.ImageJ.)
         imp (.open (ij.io.Opener.) test-tiff)

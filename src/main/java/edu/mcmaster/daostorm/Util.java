@@ -1,6 +1,5 @@
 package edu.mcmaster.daostorm;
 
-import com.sun.istack.internal.NotNull;
 import ij.ImageJ;
 import ij.ImagePlus;
 import ij.gui.Overlay;

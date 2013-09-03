@@ -120,6 +120,10 @@ public class MultiFit {
         calcError();
     }
 
+    public void iter2D() {
+        update2D();
+        calcError();
+    }
     // getError
     public double getTotalError() {
         double error = 0.0;
@@ -281,11 +285,11 @@ public class MultiFit {
     }
 
     private void calcError() {
-        for (FitPeak cur : this.fits) {
-            if (cur.peak.getStatus() == PeakStatus.RUNNING) {
-                int offset = cur.offset;
-                int wx = cur.wx;
-                int wy = cur.wy;
+        for (FitPeak fit : this.fits) {
+            if (fit.peak.getStatus() == PeakStatus.RUNNING) {
+                int offset = fit.offset;
+                int wx = fit.wx;
+                int wy = fit.wy;
                 double error = 0.0;
 
                 for(int i=-wy; i <= wy; i++) {
@@ -297,12 +301,10 @@ public class MultiFit {
                         error += 2 * (fi - xi) - 2 * xi * Math.log(fi / xi);
                     }
                 }
-
-                cur.errorOld = cur.error;
-                cur.error = error;
-
-                if (Math.abs(error - cur.errorOld) / error < this.tolerance) {
-                    cur.peak.setStatus(PeakStatus.CONVERGED);
+                fit.errorOld = fit.error;
+                fit.error = error;
+                if (Math.abs(error - fit.errorOld) / error < this.tolerance) {
+                    fit.peak.setStatus(PeakStatus.CONVERGED);
                 }
             }
         }
