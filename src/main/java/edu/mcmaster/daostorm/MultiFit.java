@@ -124,6 +124,18 @@ public class MultiFit {
         update2D();
         calcError();
     }
+
+    public void iter3D() {
+        update3D();
+        calcError();
+    }
+
+    public void iterZ() {
+        updateZ();
+        calcError();
+    }
+
+
     // getError
     public double getTotalError() {
         double error = 0.0;
@@ -291,7 +303,6 @@ public class MultiFit {
                 int wx = fit.wx;
                 int wy = fit.wy;
                 double error = 0.0;
-
                 for(int i=-wy; i <= wy; i++) {
                     for (int j=-wx; j <= wx; j++) {
                         int idx = (i * this.imageSizeX) + (j + offset);
@@ -573,7 +584,7 @@ public class MultiFit {
                         jt[5] = 1.0;
 
                         // calculate jacobian
-                        double t1 = 2.0*(1.0 - xi/fi);
+                        double t1 = 2.0 * (1.0 - xi / fi);
                         jacobian[0] += t1*jt[0];
                         jacobian[1] += t1*jt[1];
                         jacobian[2] += t1*jt[2];
@@ -582,7 +593,7 @@ public class MultiFit {
                         jacobian[5] += t1*jt[5];
 
                         // calculate hessian
-                        double t2 = 2.0*xi/(fi*fi);
+                        double t2 = 2.0 * xi / (fi * fi);
                                                                         // hessian without second derivative terms.
                         hessian[0][0] += t2*jt[0]*jt[0];
                         hessian[0][1] += t2*jt[0]*jt[1];

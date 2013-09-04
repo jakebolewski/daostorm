@@ -1,5 +1,7 @@
 package edu.mcmaster.daostorm;
 
+
+// TODO: This class should be immutable
 public class Peak {
     public static final int NPARAMS= 8;
     public static final int NFITPARAMS = 7;
@@ -71,6 +73,20 @@ public class Peak {
         this.paramArray[XWIDTH] = xWidth;
         this.paramArray[YWIDTH] = yWidth;
         this.paramArray[ZCENTER] = zCenter;
+    }
+
+    /* ---------- Private Interface ----------------*/
+    private void setParamArray(double[] params) {
+        assert(params.length == 5);
+        this.paramArray = params;
+    }
+
+    /*----------- Public Interface ------------------*/
+    public Peak copyPeak() {
+        Peak copy = new Peak();
+        copy.setParamArray(this.paramArray.clone());
+        copy.setStatus(this.status);
+        return copy;
     }
 
     public double[] getParameterArray() {

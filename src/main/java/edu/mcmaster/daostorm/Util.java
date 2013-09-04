@@ -34,6 +34,14 @@ public class Util {
         return new double[]{sx, sy};
     }
 
+    public static ArrayList<Peak> copyPeakList(ArrayList<Peak> peaks) {
+        ArrayList<Peak> copy = new ArrayList<Peak>(peaks.size());
+        for (Peak p : peaks) {
+            copy.add(p.copyPeak());
+        }
+        return copy;
+    }
+
     public static ArrayList<Peak> getConvergedPeaks(ArrayList<Peak> peaks,
                                                     double minHeight,
                                                     double minWidth) {

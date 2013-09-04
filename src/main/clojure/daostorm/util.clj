@@ -210,8 +210,7 @@
     overlay))
 
 (defn visualize-residual [^doubles residual width height]
-  (let [_ (ij.ImageJ.)
-        float-buffer (float-array (alength residual))
+  (let [float-buffer (float-array (alength residual))
         float-proc (ij.process.FloatProcessor. width height)
         imp (ij.ImagePlus.)]
     (dotimes [i (alength residual)]
@@ -225,8 +224,9 @@
         width (.getWidth imp)
         height (.getHeight imp)
         peaks (local-max-peaks imp)
+        local-max (Util/copyPeakList peaks)
         [result-peaks residual] (do-fit imp peaks 1e-8 2000 false)]
-    (show-imp-overlay imp (peaks-update-overlay peaks result-peaks))
+    (show-imp-overlay imp (peaks-update-overlay local-max result-peaks))
     (visualize-residual residual width height)))
 
 
