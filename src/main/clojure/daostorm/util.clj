@@ -1,21 +1,30 @@
 (ns daostorm.util
-  (:import [edu.mcmaster.daostorm Util MultiFit]))
+  (:import [edu.mcmaster.daostorm Util MultiFit PeakStatus]))
 
 (def ^:const test-tiff
   "/home/jake/STORM_DATA/comp.tif")
 
+(def colors {:green java.awt.Color/GREEN
+             :red java.awt.Color/RED
+             :yellow java.awt.Color/YELLOW
+             :blue java.awt.Color/BLACK
+             :gray java.awt.Color/LIGHT_GRAY})
+
+
 (defn load-imp [filename]
   (.openImage (ij.io.Opener.) filename))
 
-(defn ^ij.gui.PointRoi peak-to-point [peak]
+(defn ^ij.gui.PointRoi peak->point
+  [peak & {:keys [color] :or {:color (:light-gray colors)}}]
   (let [x (+ (.getXCenter peak) 0.5)
         y (+ (.getYCenter peak) 0.5)]
-    (ij.gui.PointRoi. x y)))
+    (doto (ij.gui.PointRoi. x y)
+      (.setStrokeColor color))))
 
 (defn ^ij.gui.Overlay peaks-overlay [^java.util.ArrayList peaks]
   (let [overlay (ij.gui.Overlay.)]
     (doseq [p peaks]
-      (.add overlay (peak-to-point p)))
+      (.add overlay (peak->point p)))
     overlay))
 
 (defn ^java.util.ArrayList find-local-maxima
@@ -77,10 +86,10 @@
         img-width (.getWidth imp)
         img-height (.getHeight imp)
         taken (int-array (alength img-array))
-        threshold 300.0
-        radius 2.0
-        background 100.0
-        sigma 1.2]
+        threshold 200.0
+        radius 1.5
+        background 60.0
+        sigma 1.5]
   (find-local-maxima
         img-array taken threshold radius background
         sigma img-width img-height margin)))
@@ -122,7 +131,8 @@
   (doto imp (.add x)))
 
 (defn sub-from-imp [imp x]
-  (doto imp (.subtract x)))
+  (.. imp getProcessor (subtract (double x)))
+  imp)
 
 (defn converged-peaks [multi peaks]
   (.getConvergedPeaks multi peaks 0.0 0.0))
@@ -195,25 +205,37 @@
        (.getResidual multi)])))
 
 
-(defn ^ij.gui.PointRoi peak-to-point-color [peak color]
-  (let [x (+ (.getXCenter peak) 0.5)
-        y (+ (.getYCenter peak) 0.5)]
-    (doto (ij.gui.PointRoi. x y)
-      (.setFillColor color))))
+(defn peak->oval
+  [peak & {:keys [color] :or {color (:gray colors)}}]
+  (let [height (* (.getYWidth peak) 2.5)
+        width (* (.getXWidth peak) 2.5)
+        x (- (+ (.getXCenter peak) 0.5) (/ width 2.0))
+        y (- (+ (.getYCenter peak) 0.5) (/ height 2.0))]
+    (doto (ij.gui.OvalRoi. x y width height)
+      (.setStrokeColor color))))
+
+(defn filter-converged [peaks]
+  (filter #(.hasStatus % PeakStatus/CONVERGED) peaks))
+
+(defn converged? [peak]
+  (.hasStatus peak PeakStatus/CONVERGED))
 
 (defn ^ij.gui.Overlay peaks-update-overlay [^java.util.ArrayList maxima
                                             ^java.util.ArrayList peaks]
   (let [overlay (ij.gui.Overlay.)]
     (doseq [p maxima]
-      (.add overlay (peak-to-point-color p java.awt.Color/RED)))
+      (.add overlay (peak->point p :color (:gray colors))))
     (doseq [p peaks]
-      (.add overlay (peak-to-point-color p java.awt.Color/GREEN)))
+      (if (converged? p)
+        (.add overlay (peak->oval p :color (:green colors)))
+        (.add overlay (peak->oval p :color (:red colors)))))
     overlay))
 
-(defn visualize-residual [^doubles residual width height]
+(defn visualize-double-buffer [^doubles residual width height title]
   (let [float-buffer (float-array (alength residual))
         float-proc (ij.process.FloatProcessor. width height)
-        imp (ij.ImagePlus.)]
+        imp (doto (ij.ImagePlus.)
+              (.setTitle title))]
     (dotimes [i (alength residual)]
       (aset-float float-buffer i (aget residual i)))
     (.setPixels float-proc float-buffer)
@@ -227,18 +249,22 @@
      :unconverged (aget stats 2)
      :total (aget stats 3)}))
 
+(defn subtract-baseline [imp baseline]
+  {:pre [(>= baseline 0)]}
+  (sub-from-imp imp baseline))
+
 (defn test-fitting []
-  (let [imp (load-imp test-tiff)
+  (let [imp (-> (doto (load-imp test-tiff) (.setSlice 2))
+                (subtract-baseline 100))
         width (.getWidth imp)
         height (.getHeight imp)
         peaks (local-max-peaks imp)
         local-max (Util/copyPeakList peaks)
-        [result-peaks residual] (do-fit imp peaks 1e-6 2 false)
+        [result-peaks residual] (do-fit imp peaks 1e-6 200 false)
         fit-stats (fit-stats result-peaks)]
-    (doall (map #(prn (.getYCenter %)) local-max))
     (prn fit-stats)
     (show-imp-overlay imp (peaks-update-overlay local-max result-peaks))
-    (visualize-residual residual width height)))
+    (visualize-double-buffer residual width height "Residual")))
 
 (test-fitting)
 
@@ -246,7 +272,6 @@
   (let [imp (load-imp filename)
         peaks (local-max-peaks imp)]
     (show-imp-overlay imp (peaks-overlay peaks))))
-
 
 (defn -main [& args]
   (let [ij (ij.ImageJ.)
