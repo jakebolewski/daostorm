@@ -19,8 +19,9 @@
     overlay))
 
 (defn ^java.util.ArrayList find-local-maxima
-  [img-array taken threshold radius sigma
-   background image-width image-height margin]
+  [img-array taken threshold radius background sigma
+   image-width image-height margin]
+
   (edu.mcmaster.daostorm.Util/findLocalMaxima
     img-array taken threshold radius background
     sigma image-width image-height margin))
@@ -179,11 +180,11 @@
         multi (MultiFit. data peaks tolerance width height z-fit?)
         num-iters (atom 0)]
     (do
-      (.iter2D multi)
+      (.iter3D multi)
       (loop [i 1]
         (when (and (> (.getNumUnconverged multi))
                    (< i max-iters))
-          (.iter2D multi)
+          (.iter3D multi)
           (swap! num-iters inc)
           (prn (str "Total Error: iteration " i " error: " (.getTotalError multi)))
           (recur (inc i))))
@@ -219,16 +220,27 @@
     (.setProcessor imp float-proc)
     (.show imp)))
 
+(defn fit-stats [peaks]
+  (let [stats (Util/fitStats peaks)]
+    {:converged (aget stats 0)
+     :bad (aget stats 1)
+     :unconverged (aget stats 2)
+     :total (aget stats 3)}))
+
 (defn test-fitting []
   (let [imp (load-imp test-tiff)
         width (.getWidth imp)
         height (.getHeight imp)
         peaks (local-max-peaks imp)
         local-max (Util/copyPeakList peaks)
-        [result-peaks residual] (do-fit imp peaks 1e-8 2000 false)]
+        [result-peaks residual] (do-fit imp peaks 1e-6 2 false)
+        fit-stats (fit-stats result-peaks)]
+    (doall (map #(prn (.getYCenter %)) local-max))
+    (prn fit-stats)
     (show-imp-overlay imp (peaks-update-overlay local-max result-peaks))
     (visualize-residual residual width height)))
 
+(test-fitting)
 
 (defn show-local-maxima [filename]
   (let [imp (load-imp filename)

@@ -298,7 +298,7 @@ public class MultiFit {
 
     private void calcError() {
         for (FitPeak fit : this.fits) {
-            if (fit.peak.getStatus() == PeakStatus.RUNNING) {
+            if (fit.peak.hasStatus(PeakStatus.RUNNING)) {
                 int offset = fit.offset;
                 int wx = fit.wx;
                 int wy = fit.wy;
@@ -309,7 +309,7 @@ public class MultiFit {
                         double fi = this.foregroundData[idx] +
                                     (this.backgroundData[idx] / ((double) this.backgroundCounts[idx]));
                         double xi = this.imageData[idx];
-                        error += 2 * (fi - xi) - 2 * xi * Math.log(fi / xi);
+                        error += (2 * (fi - xi)) - (2 * xi * Math.log(fi / xi));
                     }
                 }
                 fit.errorOld = fit.error;
@@ -325,9 +325,8 @@ public class MultiFit {
         Arrays.fill(this.foregroundData, 1.0);
         Arrays.fill(this.backgroundData, 0.0);
         Arrays.fill(this.backgroundCounts, 0);
-
         for (FitPeak fit : this.fits) {
-            if (fit.peak.getStatus() != PeakStatus.ERROR) {
+            if (!fit.peak.hasStatus(PeakStatus.ERROR)) {
                 addPeak(fit);
             }
         }
@@ -499,20 +498,22 @@ public class MultiFit {
                    }
                 }
 
-                // subtract the old peak out of the foreground and background arrays
-                subtractPeak(fit);
+               // subtract the old peak out of the foreground and background arrays
+               subtractPeak(fit);
 
-                // use lapack to solve Ax=B to calculate update vector;
-                boolean error = false;
-                RealMatrix hessianMatrix = MatrixUtils.createRealMatrix(hessian);
-                RealVector jacobianVector = MatrixUtils.createRealVector(jacobian);
-                try {
+               // use lapack to solve Ax=B to calculate update vector;
+               boolean error = false;
+               RealMatrix hessianMatrix = MatrixUtils.createRealMatrix(hessian);
+               RealVector jacobianVector = MatrixUtils.createRealVector(jacobian);
+               try {
                     MatrixUtils.solveUpperTriangularSystem(hessianMatrix, jacobianVector);
-                } catch(Exception ex) {
+               } catch(Exception ex) {
+                    System.out.println("Fitting ERROR:");
+                    System.out.println(ex.getMessage());
                     fit.peak.setStatus(PeakStatus.ERROR);
                     error = true;
-                }
-                if (!error) {
+               }
+               if (!error) {
                     // update parameters
                     delta[Peak.HEIGHT] = jacobianVector.getEntry(0);
                     delta[Peak.XCENTER] = jacobianVector.getEntry(1);
@@ -529,7 +530,7 @@ public class MultiFit {
                         fit.wy = calcWidth(fit.peak.getYWidth(), fit.wy);
                         addPeak(fit);
                     }
-                }
+               }
             }
         }
     }
@@ -649,10 +650,12 @@ public class MultiFit {
 
                     fitDataUpdate(fit, delta);
 
-                    // add the new peak to foreground and background arrays
-                    fit.wx = calcWidth(fit.peak.getXWidth(), fit.wx);
-                    fit.wy = calcWidth(fit.peak.getYWidth(), fit.wy);
-                    addPeak(fit);
+                    if (!fit.peak.hasStatus(PeakStatus.ERROR)) {
+                        // add the new peak to foreground and background arrays
+                        fit.wx = calcWidth(fit.peak.getXWidth(), fit.wx);
+                        fit.wy = calcWidth(fit.peak.getYWidth(), fit.wy);
+                        addPeak(fit);
+                    }
                 }
             }
         }
@@ -878,7 +881,7 @@ public class MultiFit {
                     fitDataUpdate(fit, delta);
 
                     // add the new peak to the foreground and background arrays
-                    if (fit.peak.getStatus() != PeakStatus.ERROR) {
+                    if (!fit.peak.hasStatus(PeakStatus.ERROR)) {
                         addPeak(fit);
                     }
                 }

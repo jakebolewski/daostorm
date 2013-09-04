@@ -277,6 +277,7 @@ public class Util {
                     }
                     if (isMax) {
                         if (taken[idx] < 2) {
+                            // TODO: Should we center the inital peaks in the middle of the pixel? +0.5
                             Peak newPeak = new Peak(
                                                 pixel - background, // height
                                                 background,         // background
