@@ -58,20 +58,21 @@ public class MultiFit {
         this.fits = new ArrayList<FitPeak>(params.size());
         for (Peak p : params) {
             FitPeak newFit = new FitPeak(p, 10);
-            if (newFit.peak.getStatus() == PeakStatus.RUNNING) {
+            if (newFit.peak.hasStatus(PeakStatus.RUNNING)) {
                 newFit.error = 0.0;
                 newFit.errorOld = 0.0;
             } else {
                 newFit.error = newFit.peak.getIError();
                 newFit.errorOld = newFit.error;
             }
+
             if (zFitting) {
                 calcWidthsFromZ(newFit);
             } else {
                 newFit.peak.setXWidth(
-                    1.0 / (2.0 * (Math.pow(newFit.peak.getXWidth(), 2))));
+                    1.0 / (2.0 * Math.pow(newFit.peak.getXWidth(), 2)));
                 newFit.peak.setYWidth(
-                    1.0 / (2.0 * (Math.pow(newFit.peak.getYWidth(), 2))));
+                    1.0 / (2.0 * Math.pow(newFit.peak.getYWidth(), 2)));
             }
 
             newFit.xc = (int) newFit.peak.getXCenter();
@@ -79,6 +80,7 @@ public class MultiFit {
             // possible bug casting fromm double to int in original version
             newFit.wx = calcWidth(newFit.peak.getXWidth(), -10);
             newFit.wy = calcWidth(newFit.peak.getYWidth(), -10);
+
 
             // todo these are annoying constants
             newFit.setClampHeight(1000.0);
@@ -169,6 +171,20 @@ public class MultiFit {
         }
     }
 
+    public double[] getForeground() {
+        double[] foreground = new double[this.foregroundData.length];
+        getForeground(foreground);
+        return foreground;
+    }
+
+    public void getForeground(double[] foreground) {
+        assert(foreground.length == this.foregroundData.length);
+        calcFit();
+        for (int i=0; i < foreground.length; i++) {
+            foreground[i] = this.foregroundData[i];
+        }
+    }
+
     public ArrayList<Peak> getResults() {
         ArrayList<Peak> results = new ArrayList<Peak>(this.fits.size());
         for (FitPeak fit : this.fits) {
@@ -194,7 +210,7 @@ public class MultiFit {
         } else {
             int newWidth = oldWidth;
             double tmp = 4.0 * Math.sqrt(1.0 / (2.0 * peakWidth));
-            if (Math.abs(tmp - ((double) oldWidth) - 0.0) > this.HYSTERESIS) {
+            if (Math.abs(tmp - ((double) oldWidth) - 0.5) > this.HYSTERESIS) {
                 newWidth = (int) tmp;
             }
             newWidth = Math.min(newWidth, this.MARGIN);
@@ -228,7 +244,6 @@ public class MultiFit {
 
 
     private void fitDataUpdate(FitPeak fit, double[] deltas) {
-
         // update sign and clamp solution if appears to be oscillating
         for (int i=0; i < deltas.length; i++) {
             if (fit.sign[i] != 0) {
@@ -314,7 +329,7 @@ public class MultiFit {
                 }
                 fit.errorOld = fit.error;
                 fit.error = error;
-                if (Math.abs(error - fit.errorOld) / error < this.tolerance) {
+                if ((Math.abs(error - fit.errorOld) / error) < this.tolerance) {
                     fit.peak.setStatus(PeakStatus.CONVERGED);
                 }
             }
@@ -342,18 +357,18 @@ public class MultiFit {
 
         double xCenter = fit.peak.getXCenter();
         double xWidth = fit.peak.getXWidth();
-        for (int i=(xc - wx); i < (xc + wx); i++) {
+        for (int i=(xc - wx); i <= (xc + wx); i++) {
             double xt = ((double) i) - xCenter;
-            int n = i - xc + wx;
+            int n = (i - xc) + wx;
             fit.xt[n] = xt;
             fit.ext[n] = Math.exp(-xt * xt * xWidth);
         }
 
         double yCenter = fit.peak.getYCenter();
         double yWidth = fit.peak.getYWidth();
-        for (int i=(yc - wy); i < (yc + wy); i++) {
+        for (int i=(yc - wy); i <= (yc + wy); i++) {
             double yt = ((double) i) - yCenter;
-            int n = i - yc + wy;
+            int n = (i - yc) + wy;
             fit.yt[n] = yt;
             fit.eyt[n] = Math.exp(-yt * yt * yWidth);
         }
@@ -382,7 +397,6 @@ public class MultiFit {
         int offset = fit.offset;
         double background = fit.peak.getBackground();
         double height = fit.peak.getHeight();
-
         for (int i=-wy; i <= wy; i++) {
             double eyt = fit.eyt[i + wy];
             for (int j=-wx; j <= wx; j++) {
@@ -562,11 +576,11 @@ public class MultiFit {
                 double xwidth = fit.peak.getXWidth();
                 double ywidth = fit.peak.getYWidth();
 
-                for (int i=-wy; i < +wy; i++) {
+                for (int i=-wy; i <= +wy; i++) {
                     double yt = fit.yt[i + wy];
-                    double eyt = fit.yt[i + wy];
+                    double eyt = fit.eyt[i + wy];
 
-                    for (int j=-wx; j < + wx; j++) {
+                    for (int j=-wx; j <= +wx; j++) {
                         double xt = fit.xt[j + wx];
                         double ext = fit.ext[j + wx];
 
