@@ -10,7 +10,6 @@
              :blue java.awt.Color/BLACK
              :gray java.awt.Color/LIGHT_GRAY})
 
-
 (defn load-imp [filename]
   (.openImage (ij.io.Opener.) filename))
 
@@ -182,6 +181,11 @@
       [(- cur-threshold threshold) false]
       [cur-threshold true])))
 
+(defn find-peaks [fit-data]
+  ;;todo: support masking with ImageJ's ROI's
+  (let [masked-residual (:residual fit-data)]
+
+    ))
 (defn do-fit [imp peaks tolerance max-iters z-fit?]
   (let [num-peaks (.size peaks)
         data (imp-to-1d-double-array imp)
@@ -242,6 +246,11 @@
     (.setProcessor imp float-proc)
     (.show imp)))
 
+(defn show-local-maxima [filename]
+  (let [imp (load-imp filename)
+        peaks (local-max-peaks imp)]
+    (show-imp-overlay imp (peaks-overlay peaks))))
+
 (defn fit-stats [peaks]
   (let [stats (Util/fitStats peaks)]
     {:converged (aget stats 0)
@@ -268,10 +277,34 @@
 
 (test-fitting)
 
-(defn show-local-maxima [filename]
-  (let [imp (load-imp filename)
-        peaks (local-max-peaks imp)]
-    (show-imp-overlay imp (peaks-overlay peaks))))
+(defn fit-data
+  [imp params &
+   {:keys [background margin neighborhood new-peak-radius]
+    :or {background -1 margin 10 neighborhood 5.0 new-peak-radius 1.0}}]
+  (let [pad-size 10
+        image (imp-to-1d-double-array imp)
+        background (get :background params (imp-mean imp))
+        cur-threshold (let [threshold (:threshold params)
+                            iterations (:iterations params)]
+                        (if (> iterations 4)
+                          (* 4.0 threshold)
+                          (double (* iterations threshold))))
+        cutoff (+ background cur-threshold)]
+    {:image image
+     :background (get :background params (imp-mean imp))
+     :cur-threshold cur-threshold
+     :cutoff cutoff
+     :find-max-radius 5
+     :margin margin
+     :neighborhood (* (:params sigma) neighborhood)
+     :new-peak-radius new-peak-radius
+     :pad-size (double pad-size)
+     :peaks nil
+     :proximity 5.0
+     :residual image
+     :sigma (:params sigma)
+     :taken (int-array (alength image))
+     :threshold (:threshold params)}))
 
 (defn -main [& args]
   (let [ij (ij.ImageJ.)
