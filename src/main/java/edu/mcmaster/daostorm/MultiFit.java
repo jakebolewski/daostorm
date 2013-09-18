@@ -16,18 +16,18 @@ public class MultiFit {
     private double tolerance;
 
     // imagedata
-    private double[] imageData;
-    private int imageSizeX;
-    private int imageSizeY;
+    private double[] imgData;
+    private int imgSizeX;
+    private int imgSizeY;
 
     // background data
-    private double[] foregroundData;
+    private double[] fgData;
 
     // fits (foreground) data
-    private double[] backgroundData;
+    private double[] bgData;
 
     // number of peaks covering a particular pixel
-    private int[] backgroundCounts;
+    private int[] bgCounts;
 
     // Z fitting
     private double[] wxZParams;
@@ -47,13 +47,13 @@ public class MultiFit {
 
         this.tolerance = tolerance;
 
-        this.imageData = image;
-        this.imageSizeX = imageSizeX;
-        this.imageSizeY = imageSizeY;
+        this.imgData = image;
+        this.imgSizeX = imageSizeX;
+        this.imgSizeY = imageSizeY;
 
-        this.foregroundData = new double[image.length];
-        this.backgroundData = new double[image.length];
-        this.backgroundCounts = new int[image.length];
+        this.fgData = new double[image.length];
+        this.bgData = new double[image.length];
+        this.bgCounts = new int[image.length];
 
         this.fits = new ArrayList<FitPeak>(params.size());
         for (Peak p : params) {
@@ -77,10 +77,10 @@ public class MultiFit {
 
             newFit.xc = (int) newFit.peak.getXCenter();
             newFit.yc = (int) newFit.peak.getYCenter();
+
             // possible bug casting fromm double to int in original version
             newFit.wx = calcWidth(newFit.peak.getXWidth(), -10);
             newFit.wy = calcWidth(newFit.peak.getYWidth(), -10);
-
 
             // todo these are annoying constants
             newFit.setClampHeight(1000.0);
@@ -158,37 +158,37 @@ public class MultiFit {
     }
 
     public double[] getResidual() {
-        double[] residual = new double[this.imageData.length];
+        double[] residual = new double[this.imgData.length];
         getResidual(residual);
         return residual;
     }
 
     public void getResidual(double[] residual) {
-        assert(residual.length == this.imageData.length);
+        assert(residual.length == this.imgData.length);
         calcFit();
         for (int i=0; i < residual.length; i++) {
-            residual[i] = this.imageData[i] - this.foregroundData[i];
+            residual[i] = this.imgData[i] - this.fgData[i];
         }
     }
 
     public double[] getForeground() {
-        double[] foreground = new double[this.foregroundData.length];
+        double[] foreground = new double[this.fgData.length];
         getForeground(foreground);
         return foreground;
     }
 
     public void getForeground(double[] foreground) {
-        assert(foreground.length == this.foregroundData.length);
+        assert(foreground.length == this.fgData.length);
         calcFit();
         for (int i=0; i < foreground.length; i++) {
-            foreground[i] = this.foregroundData[i];
+            foreground[i] = this.fgData[i];
         }
     }
 
     public ArrayList<Peak> getResults() {
         ArrayList<Peak> results = new ArrayList<Peak>(this.fits.size());
         for (FitPeak fit : this.fits) {
-            if (fit.peak.getStatus() != PeakStatus.ERROR) {
+            if (!fit.peak.hasStatus(PeakStatus.ERROR)) {
                 fit.peak.setXWidth(Math.sqrt(1.0 / (2.0 * fit.peak.getXWidth())));
                 fit.peak.setYWidth(Math.sqrt(1.0 / (2.0 * fit.peak.getYWidth())));
             } else  {
@@ -244,6 +244,7 @@ public class MultiFit {
 
 
     private void fitDataUpdate(FitPeak fit, double[] deltas) {
+
         // update sign and clamp solution if appears to be oscillating
         for (int i=0; i < deltas.length; i++) {
             if (fit.sign[i] != 0) {
@@ -254,14 +255,13 @@ public class MultiFit {
                 }
             }
             if (deltas[i] > 0.0) {
-                fit.sign[i] = 1;
+                fit.sign[i] = (byte) +1;
             } else {
-                fit.sign[i] = -1;
+                fit.sign[i] = (byte) -1;
             }
             // update values based on delta and clamp
             if (deltas[i] != 0.0) {
-                double update = deltas[i] /
-                        (1.0 + Math.abs(deltas[i]) / fit.clamp[i]);
+                double update = deltas[i] / (1.0 + Math.abs(deltas[i]) / fit.clamp[i]);
                 fit.peak.addToParameter(i, -update);
             }
         }
@@ -280,9 +280,9 @@ public class MultiFit {
         int yc = fit.yc;
 
         if ((xc < this.MARGIN) ||
-            (xc >= (imageSizeX - this.MARGIN)) ||
+            (xc >= (imgSizeX - this.MARGIN)) ||
             (yc < this.MARGIN) ||
-            (yc >= (imageSizeY - this.MARGIN))) {
+            (yc >= (imgSizeY - this.MARGIN))) {
             fit.peak.setStatus(PeakStatus.BADPEAK);
         }
 
@@ -314,16 +314,15 @@ public class MultiFit {
     private void calcError() {
         for (FitPeak fit : this.fits) {
             if (fit.peak.hasStatus(PeakStatus.RUNNING)) {
-                int offset = fit.offset;
-                int wx = fit.wx;
-                int wy = fit.wy;
+                final int offset = fit.offset;
+                final int wx = fit.wx;
+                final int wy = fit.wy;
                 double error = 0.0;
                 for(int i=-wy; i <= wy; i++) {
                     for (int j=-wx; j <= wx; j++) {
-                        int idx = (i * this.imageSizeX) + (j + offset);
-                        double fi = this.foregroundData[idx] +
-                                    (this.backgroundData[idx] / ((double) this.backgroundCounts[idx]));
-                        double xi = this.imageData[idx];
+                        final int idx = (i * this.imgSizeX) + (j + offset);
+                        final double fi = this.fgData[idx] + (this.bgData[idx] / ((double) this.bgCounts[idx]));
+                        final double xi = this.imgData[idx];
                         error += (2 * (fi - xi)) - (2 * xi * Math.log(fi / xi));
                     }
                 }
@@ -337,9 +336,9 @@ public class MultiFit {
     }
 
     private void calcFit() {
-        Arrays.fill(this.foregroundData, 1.0);
-        Arrays.fill(this.backgroundData, 0.0);
-        Arrays.fill(this.backgroundCounts, 0);
+        Arrays.fill(this.fgData, 1.0);
+        Arrays.fill(this.bgData, 0.0);
+        Arrays.fill(this.bgCounts, 0);
         for (FitPeak fit : this.fits) {
             if (!fit.peak.hasStatus(PeakStatus.ERROR)) {
                 addPeak(fit);
@@ -348,43 +347,43 @@ public class MultiFit {
     }
 
     private void addPeak(FitPeak fit) {
-        int xc = fit.xc;
-        int yc = fit.yc;
-        fit.offset = yc * this.imageSizeX + xc;
+        final int xc = fit.xc;
+        final int yc = fit.yc;
+        fit.offset = yc * this.imgSizeX + xc;
 
-        int wx = fit.wx;
-        int wy = fit.wy;
+        final int wx = fit.wx;
+        final int wy = fit.wy;
 
-        double xCenter = fit.peak.getXCenter();
-        double xWidth = fit.peak.getXWidth();
+        final double xCenter = fit.peak.getXCenter();
+        final double xWidth = fit.peak.getXWidth();
         for (int i=(xc - wx); i <= (xc + wx); i++) {
-            double xt = ((double) i) - xCenter;
-            int n = (i - xc) + wx;
+            final double xt = ((double) i) - xCenter;
+            final int n = (i - xc) + wx;
             fit.xt[n] = xt;
             fit.ext[n] = Math.exp(-xt * xt * xWidth);
         }
 
-        double yCenter = fit.peak.getYCenter();
-        double yWidth = fit.peak.getYWidth();
+        final double yCenter = fit.peak.getYCenter();
+        final double yWidth = fit.peak.getYWidth();
         for (int i=(yc - wy); i <= (yc + wy); i++) {
-            double yt = ((double) i) - yCenter;
-            int n = (i - yc) + wy;
+            final double yt = ((double) i) - yCenter;
+            final int n = (i - yc) + wy;
             fit.yt[n] = yt;
             fit.eyt[n] = Math.exp(-yt * yt * yWidth);
         }
 
         // gaussian function
-        int offset = fit.offset;
-        double background = fit.peak.getBackground();
-        double height = fit.peak.getHeight();
+        final int offset = fit.offset;
+        final double background = fit.peak.getBackground();
+        final double height = fit.peak.getHeight();
         for (int i=-wy; i <= wy; i++) {
-            double eyt = fit.eyt[i + wy];
+            final double eyt = fit.eyt[i + wy];
             for (int j=-wx; j <= wx; j++) {
-                double ext = fit.ext[j + wx];
-                int idx = (i * this.imageSizeX) + (j + offset);
-                this.foregroundData[idx] += height * eyt * ext;
-                this.backgroundData[idx] += background;
-                this.backgroundCounts[idx] += 1;
+                final double ext = fit.ext[j + wx];
+                final int idx = (i * this.imgSizeX) + (j + offset);
+                this.fgData[idx] += height * eyt * ext;
+                this.bgData[idx] += background;
+                this.bgCounts[idx]++;
             }
         }
     }
@@ -401,10 +400,10 @@ public class MultiFit {
             double eyt = fit.eyt[i + wy];
             for (int j=-wx; j <= wx; j++) {
                 double ext = fit.ext[j + wx];
-                int idx = (i * this.imageSizeX) + (j + offset);
-                this.foregroundData[idx] -= height * eyt * ext;
-                this.backgroundData[idx] -= background;
-                this.backgroundCounts[idx] -= 1;
+                int idx = (i * this.imgSizeX) + (j + offset);
+                this.fgData[idx] -= height * eyt * ext;
+                this.bgData[idx] -= background;
+                this.bgCounts[idx] -= 1;
             }
         }
     }
@@ -456,26 +455,26 @@ public class MultiFit {
                      (4.0 * this.wyZParams[4] * z2);
                 double gy = -2.0 * zt / (this.wyZParams[0] * fit.wxTerm);
 
-               for (int i=-wy; i < +wy; i++) {
+                for (int i=-wy; i < +wy; i++) {
+
                    double yt = fit.yt[i + wy];
                    double eyt = fit.eyt[i + wy];
 
                    for(int j=-wx; j < +wx; j++) {
+
                        double xt = fit.xt[j + wx];
                        double ext = fit.ext[j + wx];
 
-                       int idx = (i * this.imageSizeX) + (j + offset);
-                       double xi = this.imageData[idx];
-                       double fi = this.foregroundData[idx] /
-                               (this.backgroundData[idx] / ((double) this.backgroundCounts[idx]));
+                       int idx = (i * this.imgSizeX) + (j + offset);
+                       double xi = this.imgData[idx];
+                       double fi = this.fgData[idx] / (this.bgData[idx] / ((double) this.bgCounts[idx]));
 
                        // first derivatives
                        double et = ext * eyt;
                        jt[0] = et;
                        jt[1] = 2.0 * height * xwidth * xt * et;
                        jt[2] = 2.0 * height * ywidth * yt * et;
-                       jt[3] = (-height * xt * xt * gx * et) -
-                               (height * yt * yt * gy * et);
+                       jt[3] = (-height * xt * xt * gx * et) - (height * yt * yt * gy * et);
                        jt[4] = 1.0;
 
                        // calculate jacobian
@@ -584,11 +583,11 @@ public class MultiFit {
                         double xt = fit.xt[j + wx];
                         double ext = fit.ext[j + wx];
 
-                        int idx = (i * this.imageSizeX) + (j + offset);
+                        int idx = (i * this.imgSizeX) + (j + offset);
 
-                        double xi = this.imageData[idx];
-                        double fi = this.foregroundData[idx] +
-                                (this.backgroundData[idx] / ((double) this.backgroundCounts[idx]));
+                        double xi = this.imgData[idx];
+                        double fi = this.fgData[idx] +
+                                (this.bgData[idx] / ((double) this.bgCounts[idx]));
 
                         double et = ext * eyt;
                         jt[0] = et;
@@ -706,10 +705,10 @@ public class MultiFit {
                         double xt = fit.xt[j + wx];
                         double ext = fit.ext[j + wx];
 
-                        int idx = (i * this.imageSizeX) + (j + offset);
-                        double xi = this.imageData[idx];
-                        double fi = this.foregroundData[idx] +
-                                (this.backgroundData[idx] / ((double) this.backgroundCounts[idx]));
+                        int idx = (i * this.imgSizeX) + (j + offset);
+                        double xi = this.imgData[idx];
+                        double fi = this.fgData[idx] +
+                                (this.bgData[idx] / ((double) this.bgCounts[idx]));
 
                         double et = ext * eyt;
                         jt[0] = et;
@@ -819,13 +818,13 @@ public class MultiFit {
                     double yt = fit.yt[i + wy];
                     double eyt = fit.eyt[i + wy];
                     for (int j=-wx; j <= +wx; j++) {
-                        int idx = (i * this.imageSizeX) + (j + offset);
+                        int idx = (i * this.imgSizeX) + (j + offset);
 
                         // est = foreground + average background
-                        double fi = this.foregroundData[idx] +
-                            (this.backgroundData[idx] / ((double) this.backgroundCounts[idx]));
+                        double fi = this.fgData[idx] +
+                            (this.bgData[idx] / ((double) this.bgCounts[idx]));
 
-                        double xi = this.imageData[idx];
+                        double xi = this.imgData[idx];
                         double xt = fit.xt[j + wx];
                         double ext = fit.ext[j + wx];
                         double et = ext * eyt;

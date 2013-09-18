@@ -200,14 +200,14 @@
                    (< i max-iters))
           (.iter3D multi)
           (swap! num-iters inc)
-          (prn (str "Total Error: iteration " i " error: " (.getTotalError multi)))
+          ;;(prn (str "Total Error: iteration " i " error: " (.getTotalError multi)))
           (recur (inc i))))
       (if (== @num-iters (dec max-iters))
         (prn (str "Failed to converge in: " @num-iters " " (.getNumUnconverged multi)))
         (prn (str "Multi-fit converged in: " @num-iters " " (.getNumUnconverged multi))))
       [(.getResults multi)
+       (.getForeground multi)
        (.getResidual multi)])))
-
 
 (defn peak->oval
   [peak & {:keys [color] :or {color (:gray colors)}}]
@@ -269,14 +269,18 @@
         height (.getHeight imp)
         peaks (local-max-peaks imp)
         local-max (Util/copyPeakList peaks)
-        [result-peaks residual] (do-fit imp peaks 1e-6 200 false)
+        [result-peaks model residual] (do-fit imp peaks 1e-6 500 false)
         fit-stats (fit-stats result-peaks)]
+    (doseq [p (take 100 result-peaks)]
+      (prn [(.getXWidth p) (.getYWidth p)]))
     (prn fit-stats)
     (show-imp-overlay imp (peaks-update-overlay local-max result-peaks))
-    (visualize-double-buffer residual width height "Residual")))
+    (visualize-double-buffer residual width height "Residual")
+    (visualize-double-buffer model width height "Model")))
 
-(test-fitting)
+  (test-fitting)
 
+(comment
 (defn fit-data
   [imp params &
    {:keys [background margin neighborhood new-peak-radius]
@@ -305,6 +309,7 @@
      :sigma (:params sigma)
      :taken (int-array (alength image))
      :threshold (:threshold params)}))
+  )
 
 (defn -main [& args]
   (let [ij (ij.ImageJ.)

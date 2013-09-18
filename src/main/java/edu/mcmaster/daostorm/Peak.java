@@ -18,17 +18,6 @@ public class Peak {
     private PeakStatus status;
     private double paramArray[];
 
-
-    /*public double height;
-    public double background;
-    public double xCenter;
-    public double yCenter;
-    public double xWidth;
-    public double yWidth;
-    public double zCenter;
-    public double integratedError;
-    */
-
     // Default Constructor
     Peak() {
         this.paramArray = new double[NPARAMS];
