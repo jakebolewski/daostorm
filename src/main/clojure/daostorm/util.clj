@@ -87,7 +87,7 @@
         taken (int-array (alength img-array))
         threshold 200.0
         radius 1.5
-        background 60.0
+        background 50.0
         sigma 1.5]
   (find-local-maxima
         img-array taken threshold radius background
@@ -186,6 +186,7 @@
   (let [masked-residual (:residual fit-data)]
 
     ))
+
 (defn do-fit [imp peaks tolerance max-iters z-fit?]
   (let [num-peaks (.size peaks)
         data (imp-to-1d-double-array imp)
@@ -209,10 +210,11 @@
        (.getForeground multi)
        (.getResidual multi)])))
 
+
 (defn peak->oval
   [peak & {:keys [color] :or {color (:gray colors)}}]
-  (let [height (* (.getYWidth peak) 2.5)
-        width (* (.getXWidth peak) 2.5)
+  (let [height (* (.getYWidth peak) 1.0)
+        width (* (.getXWidth peak) 1.0)
         x (- (+ (.getXCenter peak) 0.5) (/ width 2.0))
         y (- (+ (.getYCenter peak) 0.5) (/ height 2.0))]
     (doto (ij.gui.OvalRoi. x y width height)
@@ -262,6 +264,16 @@
   {:pre [(>= baseline 0)]}
   (sub-from-imp imp baseline))
 
+(defn subtract-baseline! [imp baseline]
+  {:pre [(> baseline 0)]}
+  (let [proc (.. imp getProcessor)
+        npixels (.getPixelCount proc)]
+  (loop [idx npixels]
+    (let [val (-> (.getf proc idx)
+                  (- baseline)
+                  (max 0.0))]
+      (.setf proc idx val)))))
+
 (defn test-fitting []
   (let [imp (-> (doto (load-imp test-tiff) (.setSlice 2))
                 (subtract-baseline 100))
@@ -276,11 +288,35 @@
     (prn fit-stats)
     (show-imp-overlay imp (peaks-update-overlay local-max result-peaks))
     (visualize-double-buffer residual width height "Residual")
-    (visualize-double-buffer model width height "Model")))
+    (visualize-double-buffer model width height "Model")
+  ))
 
-  (test-fitting)
+;; TODO: raise better error than null pointer when fitting z
+;; NullPointerException   edu.mcmaster.daostorm.MultiFit.calcWidthsFromZ (MultiFit.java:227)
+
+(defn test-multi []
+  (let [imp (-> (doto (load-imp test-tiff) (.setSlice 2))
+                (subtract-baseline 100))
+        peaks (local-max-peaks imp)
+        local-max (Util/copyPeakList peaks)
+        data (imp-to-1d-double-array imp)
+        width (.getWidth imp)
+        height (.getHeight imp)
+        multi (MultiFit. data peaks 1e-6 width height false)
+        result (.getResults multi)
+        foreground (.getForeground multi)
+        residual (.getResidual multi)]
+    (show-imp-overlay imp (peaks-update-overlay local-max result))
+    (visualize-double-buffer residual width height "Residual")
+    (visualize-double-buffer foreground width height "Model")))
+
+(test-multi)
 
 (comment
+  (test-fitting))
+
+(comment
+
 (defn fit-data
   [imp params &
    {:keys [background margin neighborhood new-peak-radius]
@@ -309,6 +345,12 @@
      :sigma (:params sigma)
      :taken (int-array (alength image))
      :threshold (:threshold params)}))
+
+
+
+
+
+
   )
 
 (defn -main [& args]

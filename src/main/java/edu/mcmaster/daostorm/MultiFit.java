@@ -81,7 +81,6 @@ public class MultiFit {
             // possible bug casting fromm double to int in original version
             newFit.wx = calcWidth(newFit.peak.getXWidth(), -10);
             newFit.wy = calcWidth(newFit.peak.getYWidth(), -10);
-
             // todo these are annoying constants
             newFit.setClampHeight(1000.0);
             newFit.setClampBackground(100.0);
@@ -244,7 +243,6 @@ public class MultiFit {
 
 
     private void fitDataUpdate(FitPeak fit, double[] deltas) {
-
         // update sign and clamp solution if appears to be oscillating
         for (int i=0; i < deltas.length; i++) {
             if (fit.sign[i] != 0) {
@@ -265,7 +263,6 @@ public class MultiFit {
                 fit.peak.addToParameter(i, -update);
             }
         }
-
         // update peak center with HYSTERESIS
         if (Math.abs(fit.peak.getXCenter() - ((double) fit.xc) - 0.5) > this.HYSTERESIS) {
             fit.xc = (int) fit.peak.getXCenter();
@@ -273,7 +270,6 @@ public class MultiFit {
         if (Math.abs(fit.peak.getYCenter() - ((double) fit.yc) - 0.5) > this.HYSTERESIS) {
             fit.yc = (int) fit.peak.getYCenter();
         }
-
         // check that the peak has not moved too close of the
         // edge of the image, flag peak as bad if it has
         int xc = fit.xc;
@@ -285,13 +281,11 @@ public class MultiFit {
             (yc >= (imgSizeY - this.MARGIN))) {
             fit.peak.setStatus(PeakStatus.BADPEAK);
         }
-
         // check for negative background or height
         if ((fit.peak.getBackground() < 0.0) ||
             (fit.peak.getHeight() < 0.0)) {
             fit.peak.setStatus(PeakStatus.ERROR);
         }
-
         // check for negative widths
         if ((fit.peak.getXWidth() < 0.0) ||
             (fit.peak.getYWidth() < 0.0)) {
@@ -349,11 +343,10 @@ public class MultiFit {
     private void addPeak(FitPeak fit) {
         final int xc = fit.xc;
         final int yc = fit.yc;
+
         fit.offset = yc * this.imgSizeX + xc;
 
         final int wx = fit.wx;
-        final int wy = fit.wy;
-
         final double xCenter = fit.peak.getXCenter();
         final double xWidth = fit.peak.getXWidth();
         for (int i=(xc - wx); i <= (xc + wx); i++) {
@@ -363,6 +356,7 @@ public class MultiFit {
             fit.ext[n] = Math.exp(-xt * xt * xWidth);
         }
 
+        final int wy = fit.wy;
         final double yCenter = fit.peak.getYCenter();
         final double yWidth = fit.peak.getYWidth();
         for (int i=(yc - wy); i <= (yc + wy); i++) {
@@ -410,9 +404,9 @@ public class MultiFit {
 
     public void updateZ() {
 
-        double[] delta = new double[Peak.NFITPARAMS];
-        double[] jt = new double[5];
-        double[] jacobian = new double[5];
+        double[]   delta = new double[Peak.NFITPARAMS];
+        double[]   jt = new double[5];
+        double[]   jacobian = new double[5];
         double[][] hessian = new double[5][5];
 
         for (FitPeak fit : this.fits) {

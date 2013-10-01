@@ -8,6 +8,7 @@ import ij.io.Opener;
 import ij.process.FloatProcessor;
 import ij.process.ImageProcessor;
 
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Collections;
 
@@ -155,6 +156,18 @@ public class Util {
             }
         }
         return out;
+    }
+
+    // TODO: make this a pure function???
+    public static void subtractBaseline(ImageProcessor ip, float baseline) {
+        assert(ip != null);
+        assert(baseline > 0.0f);
+        final int nPixels = ip.getPixelCount();
+        for (int idx=0; idx < nPixels; idx++) {
+            final float sub = ip.getf(idx) - baseline;
+            final float corr = (sub > 0.0f) ? sub : 0.0f;
+            ip.setf(idx, corr);
+        }
     }
 
     public static void addPeakROIS(ImagePlus imp, ArrayList<Peak> peaks) {
