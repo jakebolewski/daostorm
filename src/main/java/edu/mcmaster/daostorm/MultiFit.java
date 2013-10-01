@@ -74,7 +74,6 @@ public class MultiFit {
                 newFit.peak.setYWidth(
                     1.0 / (2.0 * Math.pow(newFit.peak.getYWidth(), 2)));
             }
-
             newFit.xc = (int) newFit.peak.getXCenter();
             newFit.yc = (int) newFit.peak.getYCenter();
 
@@ -348,6 +347,7 @@ public class MultiFit {
 
         final int wx = fit.wx;
         final double xCenter = fit.peak.getXCenter();
+
         final double xWidth = fit.peak.getXWidth();
         for (int i=(xc - wx); i <= (xc + wx); i++) {
             final double xt = ((double) i) - xCenter;
@@ -358,6 +358,9 @@ public class MultiFit {
 
         final int wy = fit.wy;
         final double yCenter = fit.peak.getYCenter();
+
+        assert(((int) yCenter) == wy);
+
         final double yWidth = fit.peak.getYWidth();
         for (int i=(yc - wy); i <= (yc + wy); i++) {
             final double yt = ((double) i) - yCenter;
@@ -365,6 +368,8 @@ public class MultiFit {
             fit.yt[n] = yt;
             fit.eyt[n] = Math.exp(-yt * yt * yWidth);
         }
+
+        System.out.printf("%.3f, %d\n", yCenter, yc);
 
         // gaussian function
         final int offset = fit.offset;

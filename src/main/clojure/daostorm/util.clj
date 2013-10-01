@@ -308,15 +308,50 @@
         residual (.getResidual multi)]
     (show-imp-overlay imp (peaks-update-overlay local-max result))
     (visualize-double-buffer residual width height "Residual")
+    (visualize-double-buffer foreground width height "Model")
+    ))
+
+(defn gaussian [height xc yc sigma]
+  (fn [x y] (* height (Math/exp (- (/ (+ (Math/pow (- x xc) 2) (Math/pow (- y yc) 2))
+                                   (* 2.0 (Math/pow sigma 2))))))))
+
+(defn centered-spot [size height sigma]
+  (let [proc (ij.process.FloatProcessor. size size)
+        gauss-f (gaussian height (/ size 2.0) (/ size 2.0) sigma)]
+    (loop [y 0]
+      (when (< y size)
+        (loop [x 0]
+          (when (< x size)
+            (.setf proc x y (gauss-f x y))
+            (recur (inc x))))
+        (recur (inc y))))
+    proc))
+
+(defn test-single-centered []
+  (let [ size 64
+         proc (centered-spot size 610.0 1.5)
+         imp (doto (ij.ImagePlus.) (.setProcessor proc))
+         peaks (local-max-peaks imp)
+         local-max (Util/copyPeakList peaks)
+         data (imp-to-1d-double-array imp)
+         width (.getWidth imp)
+         height (.getHeight imp)
+         multi (MultiFit. data peaks 1e-6 width height false)
+         result (.getResults multi)
+         foreground (.getForeground multi)
+         residual (.getResidual multi)]
+    ;;(show-imp-overlay imp (peaks-update-overlay local-max result))
+    (doseq [p result]
+      (println (.getXWidth p) (.getYWidth p)))
+    (visualize-double-buffer residual width height "Residual")
     (visualize-double-buffer foreground width height "Model")))
 
-(test-multi)
+
 
 (comment
   (test-fitting))
 
 (comment
-
 (defn fit-data
   [imp params &
    {:keys [background margin neighborhood new-peak-radius]
@@ -346,17 +381,15 @@
      :taken (int-array (alength image))
      :threshold (:threshold params)}))
 
-
-
-
-
-
   )
 
 (defn -main [& args]
+  (test-single-centered)
+  (comment
   (let [ij (ij.ImageJ.)
         imp (.open (ij.io.Opener.) test-tiff)
         imp2 (.. imp getProcessor convertToFloat)]
     (do (.show imp)
         (.blurGaussian imp2 8)
-        (.show (ij.ImagePlus. imp2)))))
+        (.show (ij.ImagePlus. imp2))))))
+
