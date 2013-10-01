@@ -182,19 +182,21 @@ public class MultiFit {
             foreground[i] = this.fgData[i];
         }
     }
-
+/* TODO: Make full copy of peak list...
+ */
     public ArrayList<Peak> getResults() {
         ArrayList<Peak> results = new ArrayList<Peak>(this.fits.size());
         for (FitPeak fit : this.fits) {
-            if (!fit.peak.hasStatus(PeakStatus.ERROR)) {
-                fit.peak.setXWidth(Math.sqrt(1.0 / (2.0 * fit.peak.getXWidth())));
-                fit.peak.setYWidth(Math.sqrt(1.0 / (2.0 * fit.peak.getYWidth())));
+            Peak peak = fit.peak.copyPeak();
+            if (!peak.hasStatus(PeakStatus.ERROR)) {
+                peak.setXWidth(Math.sqrt(1.0 / (2.0 * peak.getXWidth())));
+                peak.setYWidth(Math.sqrt(1.0 / (2.0 * peak.getYWidth())));
             } else  {
-                fit.peak.setXWidth(1.0);
-                fit.peak.setYWidth(1.0);
+                peak.setXWidth(1.0);
+                peak.setYWidth(1.0);
             }
-            fit.peak.setIError(fit.error);
-            results.add(fit.peak);
+            peak.setIError(fit.error);
+            results.add(peak);
         }
         return results;
     }
@@ -338,7 +340,46 @@ public class MultiFit {
             }
         }
     }
+/*
+Widths change when recalculating fit due to fits not being immutable
 
+Number of fits: Init
+Ext(0): 0.000	Center: 32.000	Width: 0.125	XC: 32	Xt: -8.000
+Ext(1): 0.002	Center: 32.000	Width: 0.125	XC: 32	Xt: -7.000
+Ext(2): 0.011	Center: 32.000	Width: 0.125	XC: 32	Xt: -6.000
+Ext(3): 0.044	Center: 32.000	Width: 0.125	XC: 32	Xt: -5.000
+Ext(4): 0.135	Center: 32.000	Width: 0.125	XC: 32	Xt: -4.000
+Ext(5): 0.325	Center: 32.000	Width: 0.125	XC: 32	Xt: -3.000
+Ext(6): 0.607	Center: 32.000	Width: 0.125	XC: 32	Xt: -2.000
+Ext(7): 0.882	Center: 32.000	Width: 0.125	XC: 32	Xt: -1.000
+Ext(8): 1.000	Center: 32.000	Width: 0.125	XC: 32	Xt: 0.000
+Ext(9): 0.882	Center: 32.000	Width: 0.125	XC: 32	Xt: 1.000
+Ext(10): 0.607	Center: 32.000	Width: 0.125	XC: 32	Xt: 2.000
+Ext(11): 0.325	Center: 32.000	Width: 0.125	XC: 32	Xt: 3.000
+Ext(12): 0.135	Center: 32.000	Width: 0.125	XC: 32	Xt: 4.000
+Ext(13): 0.044	Center: 32.000	Width: 0.125	XC: 32	Xt: 5.000
+Ext(14): 0.011	Center: 32.000	Width: 0.125	XC: 32	Xt: 6.000
+Ext(15): 0.002	Center: 32.000	Width: 0.125	XC: 32	Xt: 7.000
+Ext(16): 0.000	Center: 32.000	Width: 0.125	XC: 32	Xt: 8.000
+Number of fits: Get Residual
+Ext(0): 0.000	Center: 32.000	Width: 2.000	XC: 32	Xt: -8.000
+Ext(1): 0.000	Center: 32.000	Width: 2.000	XC: 32	Xt: -7.000
+Ext(2): 0.000	Center: 32.000	Width: 2.000	XC: 32	Xt: -6.000
+Ext(3): 0.000	Center: 32.000	Width: 2.000	XC: 32	Xt: -5.000
+Ext(4): 0.000	Center: 32.000	Width: 2.000	XC: 32	Xt: -4.000
+Ext(5): 0.000	Center: 32.000	Width: 2.000	XC: 32	Xt: -3.000
+Ext(6): 0.000	Center: 32.000	Width: 2.000	XC: 32	Xt: -2.000
+Ext(7): 0.135	Center: 32.000	Width: 2.000	XC: 32	Xt: -1.000
+Ext(8): 1.000	Center: 32.000	Width: 2.000	XC: 32	Xt: 0.000
+Ext(9): 0.135	Center: 32.000	Width: 2.000	XC: 32	Xt: 1.000
+Ext(10): 0.000	Center: 32.000	Width: 2.000	XC: 32	Xt: 2.000
+Ext(11): 0.000	Center: 32.000	Width: 2.000	XC: 32	Xt: 3.000
+Ext(12): 0.000	Center: 32.000	Width: 2.000	XC: 32	Xt: 4.000
+Ext(13): 0.000	Center: 32.000	Width: 2.000	XC: 32	Xt: 5.000
+Ext(14): 0.000	Center: 32.000	Width: 2.000	XC: 32	Xt: 6.000
+Ext(15): 0.000	Center: 32.000	Width: 2.000	XC: 32	Xt: 7.000
+Ext(16): 0.000	Center: 32.000	Width: 2.000	XC: 32	Xt: 8.000
+ */
     private void addPeak(FitPeak fit) {
         final int xc = fit.xc;
         final int yc = fit.yc;
@@ -354,6 +395,7 @@ public class MultiFit {
             final int n = (i - xc) + wx;
             fit.xt[n] = xt;
             fit.ext[n] = Math.exp(-xt * xt * xWidth);
+            //System.out.printf("Ext(%d): %.3f\tCenter: %.3f\tWidth: %.3f\tXC: %d\tXt: %.3f\n", n, fit.ext[n], xCenter, xWidth, xc, xt);
         }
 
         final int wy = fit.wy;
@@ -369,7 +411,6 @@ public class MultiFit {
             fit.eyt[n] = Math.exp(-yt * yt * yWidth);
         }
 
-        System.out.printf("%.3f, %d\n", yCenter, yc);
 
         // gaussian function
         final int offset = fit.offset;

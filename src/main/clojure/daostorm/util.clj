@@ -213,8 +213,8 @@
 
 (defn peak->oval
   [peak & {:keys [color] :or {color (:gray colors)}}]
-  (let [height (* (.getYWidth peak) 1.0)
-        width (* (.getXWidth peak) 1.0)
+  (let [height (* (.getYWidth peak) 2.5)
+        width (* (.getXWidth peak) 2.5)
         x (- (+ (.getXCenter peak) 0.5) (/ width 2.0))
         y (- (+ (.getYCenter peak) 0.5) (/ height 2.0))]
     (doto (ij.gui.OvalRoi. x y width height)
@@ -329,7 +329,7 @@
 
 (defn test-single-centered []
   (let [ size 64
-         proc (centered-spot size 610.0 1.5)
+         proc (centered-spot size 610.0 2.0)
          imp (doto (ij.ImagePlus.) (.setProcessor proc))
          peaks (local-max-peaks imp)
          local-max (Util/copyPeakList peaks)
@@ -340,16 +340,30 @@
          result (.getResults multi)
          foreground (.getForeground multi)
          residual (.getResidual multi)]
-    ;;(show-imp-overlay imp (peaks-update-overlay local-max result))
-    (doseq [p result]
+    (show-imp-overlay imp (peaks-update-overlay local-max result))
+    (doseq [p local-max]
       (println (.getXWidth p) (.getYWidth p)))
     (visualize-double-buffer residual width height "Residual")
     (visualize-double-buffer foreground width height "Model")))
 
+(defn test-single-centered-iter []
+  (let [ size 64
+         proc (centered-spot size 610.0 2.0)
+         imp (doto (ij.ImagePlus.) (.setProcessor proc))
+         peaks (local-max-peaks imp)
+         local-max (Util/copyPeakList peaks)
+         data (imp-to-1d-double-array imp)
+         width (.getWidth imp)
+         height (.getHeight imp)
+         [result-peaks model residual] (do-fit imp peaks 1e-6 500 false)]
+    (show-imp-overlay imp (peaks-update-overlay local-max result-peaks))
+    (doseq [p local-max]
+      (println (.getXWidth p) (.getYWidth p)))
+    (visualize-double-buffer residual width height "Residual")
+    (visualize-double-buffer model width height "Model")))
 
 
-(comment
-  (test-fitting))
+(test-fitting)
 
 (comment
 (defn fit-data
