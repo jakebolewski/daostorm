@@ -34,9 +34,7 @@
     overlay))
 
 (defn ^java.util.ArrayList find-local-maxima
-  [img-array taken threshold radius background sigma
-   image-width image-height margin]
-
+  [img-array taken threshold radius background sigma image-width image-height margin]
   (edu.mcmaster.daostorm.Util/findLocalMaxima
     img-array taken threshold radius background
     sigma image-width image-height margin))
@@ -75,8 +73,8 @@
         img-array-float (.. imp getProcessor getFloatArray)
         img-array-out (float-array size)]
     (dotimes [i img-height]
-      (System/arrayCopy  (aget ^objects img-array-float i) 0
-                         img-array-out (* i img-width) img-width))
+      (System/arrayCopy (aget ^objects img-array-float i) 0
+                        img-array-out (* i img-width) img-width))
     img-array-out))
 )
 
@@ -142,6 +140,9 @@
 ;;(defn converged-peaks [multi peaks]
 ;;  (.getConvergedPeaks multi peaks 0.0 0.0))
 
+(defn merge-new-peaks [peaks new-peaks radius neighborhood]
+  (Util/mergeNewPeaks peaks new-peaks radius neighborhood))
+
 (defn get-good-peaks [peaks threshold sigma]
   (Util/getGoodPeaks peaks threshold sigma))
 
@@ -187,11 +188,102 @@
       [(- cur-threshold threshold) false]
       [cur-threshold true])))
 
-(defn find-peaks [fit-data]
-  ;;todo: support masking with ImageJ's ROI's
-  (let [masked-residual (:residual fit-data)]
 
-    ))
+(defn local-max-peaks [^ij.ImagePlus imp &
+                       {:keys [taken margin threshold radius background sigma]
+                        :or {taken nil margin 10 threshold 200.0 radius 1.5 background 50.0 sigma 1.5}}]
+  (let [^doubles img-array (imp->dbuffer imp)
+        img-width (.getWidth imp)
+        img-height (.getHeight imp)
+        taken (if (nil? taken) (int-array (alength img-array)))]
+    (find-local-maxima
+      img-array taken threshold radius background
+      sigma img-width img-height margin)))
+
+(defn fit-data
+  [^ij.ImagePlus imp params &
+   {:keys [background margin neighborhood new-peak-radius]
+    :or {background 0 margin 10 neighborhood 5.0 new-peak-radius 1.0}}]
+  (let [pad-size 10
+        image (imp->dbuffer imp)
+        background (get :background params (imp-mean imp))
+        cur-threshold (let [threshold (:threshold params)
+                            iterations (:iterations params)]
+                        (if (> iterations 4)
+                          (* 4.0 threshold)
+                          (double (* iterations threshold))))
+        cutoff (+ background cur-threshold)]
+    {:image image
+     :width (.getWidth imp)
+     :height (.getHeight imp)
+     :background background
+     :cur-threshold cur-threshold
+     :cutoff cutoff
+     :find-max-radius 1.5
+     :margin margin
+     :neighborhood (* (:sigma params) neighborhood)
+     :new-peak-radius new-peak-radius
+     :pad-size (double pad-size)
+     :peaks nil
+     :proximity 1.5
+     :residual image
+     :sigma (:sigma params)
+     :taken (int-array (alength image))
+     :threshold (:threshold params)}))
+
+(defn find-maxima [^doubles img-buffer width height taken &
+                   {:keys [margin threshold radius background sigma]
+                    :or {margin 10 threshold 200.0 radius 1.5 background 50.0 sigma 1.5}}]
+  (find-local-maxima
+      img-buffer taken threshold radius background sigma width height margin))
+
+(comment
+(defn ^java.util.ArrayList find-local-maxima
+  [img-array taken threshold radius background sigma image-width image-height margin]
+  (Util/findLocalMaxima
+    img-array taken threshold radius background
+    sigma image-width image-height margin))
+  )
+
+;;todo: support masking with ImageJ's ROI's
+(defn find-peaks [fit-data]
+  (let [masked-residual (:residual fit-data)
+        imgbuffer (:image fit-data)
+        width (:width fit-data)
+        height (:height fit-data)
+        taken (:taken fit-data)
+        local-max (find-local-maxima
+                    imgbuffer taken
+                    (:cutoff fit-data)
+                    (:find-max-radius fit-data)
+                    (:background fit-data)
+                    (:sigma fit-data)
+                    width
+                    height
+                    (:margin fit-data))
+        done (if (> (:cur-threshold fit-data) (:threshold fit-data))
+               false true)]
+    (prn (.size local-max))
+    (if (== (.size local-max) 0)
+      [done fit-data]
+        (if (nil? (:peaks fit-data))
+          [false (assoc fit-data :peaks local-max)]
+          (let [peaks (:peaks fit-data)
+                merged-peaks (merge-new-peaks
+                              peaks
+                              local-max
+                              (:new-peak-radius fit-data)
+                              (:neighborhood fit-data))]
+            (if (== (.size merged-peaks) (.size peaks))
+              [done fit-data]
+              [false (assoc fit-data :peaks merged-peaks)]))))))
+
+
+(comment
+  (def params {:background 50 :sigma 1.5 :threshold 200 :iterations 200})
+  (def test-imp (load-imp test-tiff))
+  (def test-data (fit-data test-imp params))
+)
 
 (defn do-fit [^ij.ImagePlus imp ^java.util.ArrayList peaks
               & {:keys [method tolerance max-iters zfit?]
@@ -223,6 +315,37 @@
        (.getForeground multi)
        (.getResidual multi)])))
 
+
+
+(defn do-fit [^ij.ImagePlus imp ^java.util.ArrayList peaks
+              & {:keys [method tolerance max-iters zfit?]
+                 :or {method :3d tolerance 1e-6 max-iters 200 zfit? false}}]
+  (let [num-peaks (.size peaks)
+        data (imp->dbuffer imp)
+        width (.getWidth imp)
+        height (.getHeight imp)
+        multi (MultiFit. data peaks tolerance width height zfit?)
+        num-iters (atom 0)
+        iter-fit (fn [] (condp = method
+                          :2d-fixed (.iter2DFixed multi)
+                          :2d (.iter2D multi)
+                          :3d (.iter3D multi)
+                          :else (throw (Exception. "unrecognized fit method"))))]
+    (do
+      (iter-fit)
+      (loop [i 1]
+        (when (and (> (.getNumUnconverged multi))
+                   (< i max-iters))
+          (iter-fit)
+          (swap! num-iters inc)
+          ;;(prn (str "Total Error: iteration " i " error: " (.getTotalError multi)))
+          (recur (inc i))))
+      (if (== @num-iters (dec max-iters))
+        (prn (str "Failed to converge in: " @num-iters " " (.getNumUnconverged multi)))
+        (prn (str "Multi-fit converged in: " @num-iters " " (.getNumUnconverged multi))))
+      [(.getResults multi)
+       (.getForeground multi)
+       (.getResidual multi)])))
 
 (defn peak->oval
   [^Peak peak & {:keys [color] :or {color (:gray colors)}}]
@@ -378,38 +501,6 @@
     (visualize-double-buffer "Model" model width height)))
 
 (test-fitting)
-
-(comment
-(defn fit-data
-  [imp params &
-   {:keys [background margin neighborhood new-peak-radius]
-    :or {background -1 margin 10 neighborhood 5.0 new-peak-radius 1.0}}]
-  (let [pad-size 10
-        image (imp->dbuffer imp)
-        background (get :background params (imp-mean imp))
-        cur-threshold (let [threshold (:threshold params)
-                            iterations (:iterations params)]
-                        (if (> iterations 4)
-                          (* 4.0 threshold)
-                          (double (* iterations threshold))))
-        cutoff (+ background cur-threshold)]
-    {:image image
-     :background (get :background params (imp-mean imp))
-     :cur-threshold cur-threshold
-     :cutoff cutoff
-     :find-max-radius 5
-     :margin margin
-     :neighborhood (* (:params sigma) neighborhood)
-     :new-peak-radius new-peak-radius
-     :pad-size (double pad-size)
-     :peaks nil
-     :proximity 5.0
-     :residual image
-     :sigma (:params sigma)
-     :taken (int-array (alength image))
-     :threshold (:threshold params)}))
-
-  )
 
 (defn -main [& args]
   (test-single-centered)
