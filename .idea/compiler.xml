@@ -29,5 +29,8 @@
       <module name="daostorm_3d" target="1.6" />
     </bytecodeTargetLevel>
   </component>
+  <component name="JavacSettings">
+    <option name="MAXIMUM_HEAP_SIZE" value="32000" />
+  </component>
 </project>
 

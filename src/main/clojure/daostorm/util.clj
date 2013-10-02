@@ -1,5 +1,7 @@
 (ns daostorm.util
-  (:import [edu.mcmaster.daostorm Util MultiFit PeakStatus]))
+  (:import [edu.mcmaster.daostorm Util MultiFit PeakStatus Peak]))
+
+(set! *warn-on-reflection* true)
 
 (def ^:const test-tiff
   "/home/jake/STORM_DATA/comp.tif")
@@ -10,11 +12,16 @@
              :blue java.awt.Color/BLACK
              :gray java.awt.Color/LIGHT_GRAY})
 
-(defn load-imp [filename]
+(defn imagej-mainwindow []
+  (if-let [window (ij.IJ/getInstance)]
+    (.toFront window)
+    (.toFront (ij.ImageJ.))))
+
+(defn ^ij.ImagePlus load-imp [filename]
   (.openImage (ij.io.Opener.) filename))
 
 (defn ^ij.gui.PointRoi peak->point
-  [peak & {:keys [color] :or {:color (:light-gray colors)}}]
+  [^Peak peak & {:keys [color] :or {:color (:light-gray colors)}}]
   (let [x (+ (.getXCenter peak) 0.5)
         y (+ (.getYCenter peak) 0.5)]
     (doto (ij.gui.PointRoi. x y)
@@ -34,18 +41,18 @@
     img-array taken threshold radius background
     sigma image-width image-height margin))
 
-(defn imp-to-1d-double-array [^ij.ImagePlus imp]
-  (let [img-width (.getWidth imp)
-        img-height (.getHeight imp)
-        size (* img-width img-height)
-        img-array-float (.. imp getProcessor getFloatArray)
-        img-array-double (make-array Double/TYPE size)]
-    (dotimes [i img-height]
-      (dotimes [j img-width]
-        (let [idx (+ (* i img-width) j)
-              pixel (double (aget img-array-float j i))]
-          (aset-double img-array-double idx pixel))))
-    img-array-double))
+(defn imp->dbuffer [^ij.ImagePlus imp]
+  (let [width (.getWidth imp)
+        height (.getHeight imp)
+        size (* width height)
+        img-farray (.. imp getProcessor getFloatArray)
+        dbuffer (make-array Double/TYPE size)]
+    (dotimes [i height]
+      (dotimes [j width]
+        (let [idx (+ (* i width) j)
+              pixel (double (aget img-farray j i))]
+          (aset-double dbuffer idx pixel))))
+    dbuffer))
 
 (comment
 (defn fconcat [& arrays]
@@ -75,20 +82,17 @@
 
 (defn show-imp-overlay [^ij.ImagePlus imp
                         ^ij.gui.Overlay overlay]
-  (let [_ (ij.ImageJ.)]
-    (.setOverlay imp overlay)
-    (.show imp)))
+  (doto imp
+    (.setOverlay overlay)
+    (.show)))
 
-(defn local-max-peaks [^ij.ImagePlus imp]
-  (let [img-array (imp-to-1d-double-array imp)
-        margin 10
+(defn local-max-peaks [^ij.ImagePlus imp &
+                       {:keys [margin threshold radius background sigma]
+                        :or {margin 10 threshold 200.0 radius 1.5 background 50.0 sigma 1.5}}]
+  (let [^doubles img-array (imp->dbuffer imp)
         img-width (.getWidth imp)
         img-height (.getHeight imp)
-        taken (int-array (alength img-array))
-        threshold 200.0
-        radius 1.5
-        background 50.0
-        sigma 1.5]
+        taken (int-array (alength img-array))]
   (find-local-maxima
         img-array taken threshold radius background
         sigma img-width img-height margin)))
@@ -102,14 +106,14 @@
   (show-local-maxima test-tiff)
   )
 
-(defn gaussian-blur [imp sigma]
+(defn gaussian-blur [^ij.ImagePlus imp ^double sigma]
   (let [float-proc (.. imp getProcessor duplicate convertToFloat)
         blured-proc (doto float-proc
                       (.blurGaussian sigma))]
     (doto (ij.ImagePlus.)
       (.setProcessor blured-proc))))
 
-(defn imp-mean [imp]
+(defn imp-mean [^ij.ImagePlus imp]
   (.. imp getStatistics mean))
 
 (defn imp-min [^ij.ImagePlus imp]
@@ -118,23 +122,25 @@
 (defn imp-max [^ij.ImagePlus imp]
   (.. imp getStatistics max))
 
-(defn add-imp [imp1 imp2]
+(defn add-imp [^ij.ImagePlus imp1
+               ^ij.ImagePlus imp2]
   (Util/addImageProcessors
     (.getProcessor imp1) (.getProcessor imp2)))
 
-(defn sub-imp [imp1 imp2]
+(defn sub-imp [^ij.ImagePlus imp1
+               ^ij.ImagePlus imp2]
   (Util/subtractImageProcessors
     (.getProcessor imp1) (.getProcessor imp2)))
 
-(defn add-to-imp [imp x]
-  (doto imp (.add x)))
+(defn add-to-imp [^ij.ImagePlus imp ^double x]
+  (.. imp getProcessor (add x)))
 
-(defn sub-from-imp [imp x]
-  (.. imp getProcessor (subtract (double x)))
+(defn sub-from-imp [^ij.ImagePlus imp ^double x]
+  (.. imp getProcessor (subtract x))
   imp)
 
-(defn converged-peaks [multi peaks]
-  (.getConvergedPeaks multi peaks 0.0 0.0))
+;;(defn converged-peaks [multi peaks]
+;;  (.getConvergedPeaks multi peaks 0.0 0.0))
 
 (defn get-good-peaks [peaks threshold sigma]
   (Util/getGoodPeaks peaks threshold sigma))
@@ -187,19 +193,26 @@
 
     ))
 
-(defn do-fit [imp peaks tolerance max-iters z-fit?]
+(defn do-fit [^ij.ImagePlus imp ^java.util.ArrayList peaks
+              & {:keys [method tolerance max-iters zfit?]
+                 :or {method :3d tolerance 1e-6 max-iters 200 zfit? false}}]
   (let [num-peaks (.size peaks)
-        data (imp-to-1d-double-array imp)
+        data (imp->dbuffer imp)
         width (.getWidth imp)
         height (.getHeight imp)
-        multi (MultiFit. data peaks tolerance width height z-fit?)
-        num-iters (atom 0)]
+        multi (MultiFit. data peaks tolerance width height zfit?)
+        num-iters (atom 0)
+        iter-fit (fn [] (condp = method
+                          :2d-fixed (.iter2DFixed multi)
+                          :2d (.iter2D multi)
+                          :3d (.iter3D multi)
+                          :else (throw (Exception. "unrecognized fit method"))))]
     (do
-      (.iter3D multi)
+      (iter-fit)
       (loop [i 1]
         (when (and (> (.getNumUnconverged multi))
                    (< i max-iters))
-          (.iter3D multi)
+          (iter-fit)
           (swap! num-iters inc)
           ;;(prn (str "Total Error: iteration " i " error: " (.getTotalError multi)))
           (recur (inc i))))
@@ -212,7 +225,7 @@
 
 
 (defn peak->oval
-  [peak & {:keys [color] :or {color (:gray colors)}}]
+  [^Peak peak & {:keys [color] :or {color (:gray colors)}}]
   (let [height (* (.getYWidth peak) 2.5)
         width (* (.getXWidth peak) 2.5)
         x (- (+ (.getXCenter peak) 0.5) (/ width 2.0))
@@ -221,9 +234,9 @@
       (.setStrokeColor color))))
 
 (defn filter-converged [peaks]
-  (filter #(.hasStatus % PeakStatus/CONVERGED) peaks))
+  (filter #(.hasStatus ^Peak % PeakStatus/CONVERGED) peaks))
 
-(defn converged? [peak]
+(defn converged? [^Peak peak]
   (.hasStatus peak PeakStatus/CONVERGED))
 
 (defn ^ij.gui.Overlay peaks-update-overlay [^java.util.ArrayList maxima
@@ -237,13 +250,13 @@
         (.add overlay (peak->oval p :color (:red colors)))))
     overlay))
 
-(defn visualize-double-buffer [^doubles residual width height title]
-  (let [float-buffer (float-array (alength residual))
+(defn visualize-double-buffer [title ^doubles buffer width height]
+  (let [float-buffer (float-array (alength buffer))
         float-proc (ij.process.FloatProcessor. width height)
         imp (doto (ij.ImagePlus.)
               (.setTitle title))]
-    (dotimes [i (alength residual)]
-      (aset-float float-buffer i (aget residual i)))
+    (dotimes [i (alength buffer)]
+      (aset-float float-buffer i (aget buffer i)))
     (.setPixels float-proc float-buffer)
     (.setProcessor imp float-proc)
     (.show imp)))
@@ -260,11 +273,11 @@
      :unconverged (aget stats 2)
      :total (aget stats 3)}))
 
-(defn subtract-baseline [imp baseline]
+(defn ^ij.ImagePlus subtract-baseline [imp baseline]
   {:pre [(>= baseline 0)]}
   (sub-from-imp imp baseline))
 
-(defn subtract-baseline! [imp baseline]
+(defn subtract-baseline! [^ij.ImagePlus imp baseline]
   {:pre [(> baseline 0)]}
   (let [proc (.. imp getProcessor)
         npixels (.getPixelCount proc)]
@@ -275,47 +288,47 @@
       (.setf proc idx val)))))
 
 (defn test-fitting []
-  (let [imp (-> (doto (load-imp test-tiff) (.setSlice 2))
+  (let [imp (-> (doto (load-imp test-tiff) (.setSlice 1))
                 (subtract-baseline 100))
         width (.getWidth imp)
         height (.getHeight imp)
-        peaks (local-max-peaks imp)
+        peaks (local-max-peaks imp :background 50 :sigma 1.5)
         local-max (Util/copyPeakList peaks)
-        [result-peaks model residual] (do-fit imp peaks 1e-6 500 false)
+        [result-peaks model residual] (time (do-fit imp peaks :method :3d :tolerance 1e-6 :max-iters 200))
         fit-stats (fit-stats result-peaks)]
-    (doseq [p (take 100 result-peaks)]
-      (prn [(.getXWidth p) (.getYWidth p)]))
+    (imagej-mainwindow)
+    ;;(doseq [p (take 100 result-peaks)]
+      ;;(prn [(.getXWidth p) (.getYWidth p)]))
     (prn fit-stats)
     (show-imp-overlay imp (peaks-update-overlay local-max result-peaks))
-    (visualize-double-buffer residual width height "Residual")
-    (visualize-double-buffer model width height "Model")
-  ))
+    (visualize-double-buffer "Residual" residual width height)
+    (visualize-double-buffer "Model" model width height)))
 
 ;; TODO: raise better error than null pointer when fitting z
 ;; NullPointerException   edu.mcmaster.daostorm.MultiFit.calcWidthsFromZ (MultiFit.java:227)
 
 (defn test-multi []
-  (let [imp (-> (doto (load-imp test-tiff) (.setSlice 2))
+  (let [imp (-> (doto (load-imp test-tiff) (.setSlice 1))
                 (subtract-baseline 100))
         peaks (local-max-peaks imp)
         local-max (Util/copyPeakList peaks)
-        data (imp-to-1d-double-array imp)
+        data (imp->dbuffer imp)
         width (.getWidth imp)
         height (.getHeight imp)
         multi (MultiFit. data peaks 1e-6 width height false)
         result (.getResults multi)
         foreground (.getForeground multi)
         residual (.getResidual multi)]
+    (imagej-mainwindow)
     (show-imp-overlay imp (peaks-update-overlay local-max result))
-    (visualize-double-buffer residual width height "Residual")
-    (visualize-double-buffer foreground width height "Model")
-    ))
+    (visualize-double-buffer "Residual" residual width height)
+    (visualize-double-buffer "Model" foreground width height)))
 
 (defn gaussian [height xc yc sigma]
   (fn [x y] (* height (Math/exp (- (/ (+ (Math/pow (- x xc) 2) (Math/pow (- y yc) 2))
                                    (* 2.0 (Math/pow sigma 2))))))))
 
-(defn centered-spot [size height sigma]
+(defn centered-spot [& {:keys [size height sigma]}]
   (let [proc (ij.process.FloatProcessor. size size)
         gauss-f (gaussian height (/ size 2.0) (/ size 2.0) sigma)]
     (loop [y 0]
@@ -329,39 +342,40 @@
 
 (defn test-single-centered []
   (let [ size 64
-         proc (centered-spot size 610.0 2.0)
-         imp (doto (ij.ImagePlus.) (.setProcessor proc))
-         peaks (local-max-peaks imp)
+         proc (centered-spot :size size :height 610.0 :sigma 2.0)
+         ^ij.ImagePlus imp (doto (ij.ImagePlus.) (.setProcessor proc))
+         peaks (local-max-peaks imp :background 0.0 :radius 5.0 :sigma 2.0)
          local-max (Util/copyPeakList peaks)
-         data (imp-to-1d-double-array imp)
+         data (imp->dbuffer imp)
          width (.getWidth imp)
          height (.getHeight imp)
          multi (MultiFit. data peaks 1e-6 width height false)
          result (.getResults multi)
          foreground (.getForeground multi)
          residual (.getResidual multi)]
+    (imagej-mainwindow)
     (show-imp-overlay imp (peaks-update-overlay local-max result))
-    (doseq [p local-max]
+    (doseq [^Peak p local-max]
       (println (.getXWidth p) (.getYWidth p)))
-    (visualize-double-buffer residual width height "Residual")
-    (visualize-double-buffer foreground width height "Model")))
+    (visualize-double-buffer "Residual" residual width height)
+    (visualize-double-buffer "Model" foreground width height)))
 
 (defn test-single-centered-iter []
-  (let [ size 64
-         proc (centered-spot size 610.0 2.0)
+  (let [ size 128
+         proc (centered-spot :size size :height 610.0 :sigma 2.0)
          imp (doto (ij.ImagePlus.) (.setProcessor proc))
-         peaks (local-max-peaks imp)
+         peaks (local-max-peaks imp :background 1.0 :radius 2.0 :sigma 2.1)
          local-max (Util/copyPeakList peaks)
-         data (imp-to-1d-double-array imp)
+         data (imp->dbuffer imp)
          width (.getWidth imp)
          height (.getHeight imp)
-         [result-peaks model residual] (do-fit imp peaks 1e-6 500 false)]
-    (show-imp-overlay imp (peaks-update-overlay local-max result-peaks))
-    (doseq [p local-max]
+         [result-peaks model residual] (do-fit imp peaks :method :2d :tolerance 1e-2 :max-iters 200)]
+    (imagej-mainwindow)
+    ;;(show-imp-overlay imp (peaks-update-overlay local-max result-peaks))
+    (doseq [^Peak p local-max]
       (println (.getXWidth p) (.getYWidth p)))
-    (visualize-double-buffer residual width height "Residual")
-    (visualize-double-buffer model width height "Model")))
-
+    (visualize-double-buffer "Residual" residual width height)
+    (visualize-double-buffer "Model" model width height)))
 
 (test-fitting)
 
@@ -371,7 +385,7 @@
    {:keys [background margin neighborhood new-peak-radius]
     :or {background -1 margin 10 neighborhood 5.0 new-peak-radius 1.0}}]
   (let [pad-size 10
-        image (imp-to-1d-double-array imp)
+        image (imp->dbuffer imp)
         background (get :background params (imp-mean imp))
         cur-threshold (let [threshold (:threshold params)
                             iterations (:iterations params)]
