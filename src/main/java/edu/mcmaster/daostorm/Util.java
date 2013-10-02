@@ -14,16 +14,16 @@ import java.util.Collections;
 
 public class Util {
 
-    public static void printStats(ArrayList<Peak> peaks) {
+    public static void printStats(final ArrayList<Peak> peaks) {
         int[] stats = fitStats(peaks);
         double total = (double) stats[3];
         System.out.format("%d good:%t%d bad:%t%d unconverged:%t%d total:%n",
                           stats[0] / total, stats[1] / total, stats[2] / total, (int) total);
     }
 
-    public static double[] calcSxSy(double[] wxParams,
-                                    double[] wyParams,
-                                    double z)
+    public static double[] calcSxSy(final double[] wxParams,
+                                    final double[] wyParams,
+                                    final double z)
     {
         assert(wxParams != null && wyParams != null);
         assert((wxParams.length == 5) &&
@@ -35,7 +35,7 @@ public class Util {
         return new double[]{sx, sy};
     }
 
-    public static ArrayList<Peak> copyPeakList(ArrayList<Peak> peaks) {
+    public static ArrayList<Peak> copyPeakList(final ArrayList<Peak> peaks) {
         ArrayList<Peak> copy = new ArrayList<Peak>(peaks.size());
         for (Peak p : peaks) {
             copy.add(p.copyPeak());
@@ -44,7 +44,7 @@ public class Util {
     }
 
     public static ArrayList<Peak> getConvergedPeaks(ArrayList<Peak> peaks,
-                                                    double minHeight,
+                                                    final double minHeight,
                                                     double minWidth) {
         assert(peaks != null);
         assert(minHeight >= 0.0 && minWidth >= 0.0);
@@ -65,7 +65,7 @@ public class Util {
     }
 
     public static ArrayList<Peak> getGoodPeaks(ArrayList<Peak> peaks,
-                                               double minHeight,
+                                               final double minHeight,
                                                double minWidth) {
         assert(peaks != null);
         assert(minHeight >= 0.0 && minWidth >= 0.0);
@@ -84,14 +84,14 @@ public class Util {
         return goodPeaks;
     }
 
-    public static int[] fitStats(ArrayList<Peak> peaks) {
+    public static int[] fitStats(final ArrayList<Peak> peaks) {
         assert(peaks != null);
-        int total = peaks.size();
+        final int total = peaks.size();
         int numBad = 0;
         int numConverged = 0;
         int numUnconverged = 0;
         for (Peak p : peaks) {
-            PeakStatus status = p.getStatus();
+            final PeakStatus status = p.getStatus();
             if (status == PeakStatus.BADPEAK)
                 numBad++;
             else if (status == PeakStatus.CONVERGED)
@@ -102,8 +102,8 @@ public class Util {
         return new int[]{numConverged, numBad, numUnconverged, total};
     }
 
-    public static FloatProcessor subtractImageProcessors(FloatProcessor ip1,
-                                                         FloatProcessor ip2) {
+    public static FloatProcessor subtractImageProcessors(final FloatProcessor ip1,
+                                                         final FloatProcessor ip2) {
         assert(ip1 != null && ip2 != null);
         assert(ip1.getWidth() == ip2.getWidth() &&
                ip1.getHeight() == ip2.getHeight());
@@ -116,8 +116,8 @@ public class Util {
         return out;
     }
 
-    public static ImageProcessor subtractImageProcessors(ImageProcessor ip1,
-                                                         ImageProcessor ip2) {
+    public static ImageProcessor subtractImageProcessors(final ImageProcessor ip1,
+                                                         final ImageProcessor ip2) {
         assert(ip1 != null && ip2 != null);
         assert(ip1.getWidth() == ip2.getWidth() &&
                ip1.getHeight() == ip2.getHeight());
@@ -130,8 +130,8 @@ public class Util {
         return out;
     }
 
-    public static FloatProcessor addImageProcessors(FloatProcessor ip1,
-                                                    FloatProcessor ip2) {
+    public static FloatProcessor addImageProcessors(final FloatProcessor ip1,
+                                                    final FloatProcessor ip2) {
         assert(ip1 != null && ip2 != null);
         assert(ip1.getWidth() == ip2.getWidth() &&
                ip1.getHeight() == ip2.getHeight());
@@ -144,8 +144,8 @@ public class Util {
         return out;
     }
 
-    public static ImageProcessor addImageProcessors(ImageProcessor ip1,
-                                                    ImageProcessor ip2) {
+    public static ImageProcessor addImageProcessors(final ImageProcessor ip1,
+                                                    final ImageProcessor ip2) {
         assert(ip1 != null && ip2 != null);
         assert(ip1.getWidth() == ip2.getWidth() &&
                ip1.getHeight() == ip2.getHeight());
@@ -159,7 +159,8 @@ public class Util {
     }
 
     // TODO: make this a pure function???
-    public static void subtractBaseline(ImageProcessor ip, float baseline) {
+    public static void subtractBaseline(ImageProcessor ip,
+                                        final float baseline) {
         assert(ip != null);
         assert(baseline > 0.0f);
         final int nPixels = ip.getPixelCount();
@@ -170,12 +171,13 @@ public class Util {
         }
     }
 
-    public static void addPeakROIS(ImagePlus imp, ArrayList<Peak> peaks) {
+    public static void addPeakROIS(ImagePlus imp,
+                                   final ArrayList<Peak> peaks) {
         assert(imp != null && peaks != null);
         Overlay overlay = new Overlay();
         for (Peak peak : peaks) {
-            PointRoi pt = new PointRoi(peak.getXCenter() + 0.5,
-                                       peak.getYCenter() + 0.5);
+            final PointRoi pt = new PointRoi(peak.getXCenter() + 0.5,
+                                             peak.getYCenter() + 0.5);
             overlay.add(pt);
         }
         imp.setOverlay(overlay);
@@ -249,15 +251,15 @@ public class Util {
      *
      * Returns the number of peaks found.
      */
-    public static ArrayList<Peak> findLocalMaxima(double[] image,
+    public static ArrayList<Peak> findLocalMaxima(final double[] image,
                                                   int[] taken,
-                                                  double threshold,
-                                                  double radius,
-                                                  double background,
-                                                  double sigma,
-                                                  int imageSizeX,
-                                                  int imageSizeY,
-                                                  int margin)
+                                                  final double threshold,
+                                                  final double radius,
+                                                  final double background,
+                                                  final double sigma,
+                                                  final int imageSizeX,
+                                                  final int imageSizeY,
+                                                  final int margin)
     {
         ArrayList<Peak> newPeaks = new ArrayList<Peak>();
 
@@ -308,8 +310,8 @@ public class Util {
         return newPeaks;
     }
 
-    public static double[] peakToPeakDist(ArrayList<Peak> peaks1,
-                                          ArrayList<Peak> peaks2) {
+    public static double[] peakToPeakDist(final ArrayList<Peak> peaks1,
+                                          final ArrayList<Peak> peaks2) {
         double[] bestDists = new double[peaks1.size()];
         int idx = 0;
         for (Peak p1 : peaks1) {
@@ -326,8 +328,8 @@ public class Util {
         return bestDists;
     }
 
-    public static int[] peakToPeakIndex(ArrayList<Peak> peaks1,
-                                        ArrayList<Peak> peaks2) {
+    public static int[] peakToPeakIndex(final ArrayList<Peak> peaks1,
+                                        final ArrayList<Peak> peaks2) {
         int[] index = new int[peaks1.size()];
         for (Peak p1 : peaks1) {
             int idx = 0;
@@ -346,25 +348,25 @@ public class Util {
         return index;
     }
 
-    public static ArrayList<Peak> mergeNewPeaks(ArrayList<Peak> inPeaks,
-                                                ArrayList<Peak> newPeaks,
-                                                double radius,
-                                                double neighborhood)
+    public static ArrayList<Peak> mergeNewPeaks(final ArrayList<Peak> inPeaks,
+                                                final ArrayList<Peak> newPeaks,
+                                                final double radius,
+                                                final double neighborhood)
     {
-        int numInPeaks = inPeaks.size();
+        final int numInPeaks = inPeaks.size();
         ArrayList<Peak> outPeaks = new ArrayList<Peak>(numInPeaks);
         outPeaks.addAll(inPeaks);
 
         // check new peaks and add if they are ok
-        double radiusSq = radius * radius;
-        double neighborhoodSq = neighborhood * neighborhood;
+        final double radiusSq = radius * radius;
+        final double neighborhoodSq = neighborhood * neighborhood;
         for (int i=0; i < numInPeaks; i++) {
-            Peak newPeak = newPeaks.get(i);
+            final Peak newPeak = newPeaks.get(i);
             boolean bad = false;
             int j = 0;
             while ((j < numInPeaks) && (!bad)) {
-                Peak inPeak = inPeaks.get(j);
-                double distSq = newPeak.sqDist2D(inPeak);
+                final Peak inPeak = inPeaks.get(j);
+                final double distSq = newPeak.sqDist2D(inPeak);
                 if (distSq < radiusSq) {
                     bad = true;
                 } else if (distSq < neighborhoodSq) {
@@ -382,23 +384,23 @@ public class Util {
 
 
     // TODO: Spatial data structures could really speed this up
-    public static ArrayList<Peak> removeClosePeaks(ArrayList<Peak> inPeaks,
-                                                   double radius,
-                                                   double neighborhood)
+    public static ArrayList<Peak> removeClosePeaks(final ArrayList<Peak> inPeaks,
+                                                   final double radius,
+                                                   final double neighborhood)
     {
         ArrayList<Peak> outPeaks = new ArrayList<Peak>();
-        int numInPeaks = inPeaks.size();
-        double radiusSq = radius * radius;
-        double neighborhoodSq = neighborhood * neighborhood;
+        final int numInPeaks = inPeaks.size();
+        final double radiusSq = radius * radius;
+        final double neighborhoodSq = neighborhood * neighborhood;
 
         // 1. flag peaks to be removed
         for (int i=0; i < numInPeaks; i++) {
-            Peak p1 = inPeaks.get(i);
+            final Peak p1 = inPeaks.get(i);
             boolean bad = false;
             int j = 0;
             while ((j < numInPeaks) && (!bad)) {
                 if (j != i) {
-                    Peak p2 = inPeaks.get(j);
+                    final Peak p2 = inPeaks.get(j);
                     if ((p1.sqDist2D(p2) < radiusSq) &&
                         (p2.getHeight() > p1.getHeight()))
                         bad = true;
@@ -408,7 +410,7 @@ public class Util {
         }
 
         // 2. flag non-bad neighbors of bad peaks as running
-        for (Peak p1 : inPeaks) {
+        for (final Peak p1 : inPeaks) {
             if (p1.getStatus() == PeakStatus.BADPEAK) {
                 for (Peak p2 : inPeaks) {
                     if (!p1.equals(p2)) {
@@ -422,7 +424,7 @@ public class Util {
         }
 
         // 3. create a new list with the bad peaks removed
-        for (Peak p : inPeaks)
+        for (final Peak p : inPeaks)
             if (p.getStatus() != PeakStatus.BADPEAK)
                 outPeaks.add(p);
 
@@ -430,19 +432,19 @@ public class Util {
     }
 
 
-    public static ArrayList<Peak> removeNeighbors(ArrayList<Peak> inPeaks,
-                                                  double radius)
+    public static ArrayList<Peak> removeNeighbors(final ArrayList<Peak> inPeaks,
+                                                  final double radius)
     {
         ArrayList<Peak> outPeaks = new ArrayList<Peak>();
-        double radius2 = radius * radius;
-        int numPeaks = inPeaks.size();
+        final double radius2 = radius * radius;
+        final int numPeaks = inPeaks.size();
         for (int i=0; i < numPeaks; i++) {
-            Peak p1 = inPeaks.get(i);
+            final Peak p1 = inPeaks.get(i);
             boolean bad = false;
             int j = 0;
             while ((j < numPeaks) && (!bad)) {
                  if (j != i) {
-                     Peak p2 = inPeaks.get(j);
+                     final Peak p2 = inPeaks.get(j);
                      if (p1.sqDist2D(p2) < radius2)
                          bad = true;
                  }

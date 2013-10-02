@@ -1,6 +1,5 @@
 package edu.mcmaster.daostorm;
 
-
 public enum PeakStatus {
     NEW,
     RUNNING,

@@ -254,22 +254,22 @@
         taken (:taken fit-data)
         local-max (find-local-maxima
                     imgbuffer taken
-                    (:cutoff fit-data)
-                    (:find-max-radius fit-data)
-                    (:background fit-data)
-                    (:sigma fit-data)
+                    200.0
+                    1.5
+                    50.0
+                    1.5
                     width
                     height
-                    (:margin fit-data))
+                    10)
         done (if (> (:cur-threshold fit-data) (:threshold fit-data))
                false true)]
-    (prn (.size local-max))
+    (prn "cutoff: " (.size local-max))
     (if (== (.size local-max) 0)
-      [done fit-data]
-        (if (nil? (:peaks fit-data))
-          [false (assoc fit-data :peaks local-max)]
-          (let [peaks (:peaks fit-data)
-                merged-peaks (merge-new-peaks
+      [done local-max]
+      (if (nil? (:peaks fit-data))
+        [false (assoc fit-data :peaks local-max)]
+        (let [peaks (:peaks fit-data)
+              merged-peaks (merge-new-peaks
                               peaks
                               local-max
                               (:new-peak-radius fit-data)
