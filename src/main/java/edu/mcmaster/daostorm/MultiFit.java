@@ -186,7 +186,7 @@ public class MultiFit {
  */
     public ArrayList<Peak> getResults() {
         ArrayList<Peak> results = new ArrayList<Peak>(this.fits.size());
-        for (FitPeak fit : this.fits) {
+        for (final FitPeak fit : this.fits) {
             Peak peak = fit.peak.copyPeak();
             if (!peak.hasStatus(PeakStatus.ERROR)) {
                 peak.setXWidth(Math.sqrt(1.0 / (2.0 * peak.getXWidth())));
@@ -260,7 +260,7 @@ public class MultiFit {
             }
             // update values based on delta and clamp
             if (deltas[i] != 0.0) {
-                double update = deltas[i] / (1.0 + Math.abs(deltas[i]) / fit.clamp[i]);
+                final double update = deltas[i] / (1.0 + Math.abs(deltas[i]) / fit.clamp[i]);
                 fit.peak.addToParameter(i, -update);
             }
         }
@@ -349,7 +349,6 @@ public class MultiFit {
 
         final int wx = fit.wx;
         final double xCenter = fit.peak.getXCenter();
-
         final double xWidth = fit.peak.getXWidth();
         for (int i=(xc - wx); i <= (xc + wx); i++) {
             final double xt = ((double) i) - xCenter;
@@ -360,9 +359,6 @@ public class MultiFit {
 
         final int wy = fit.wy;
         final double yCenter = fit.peak.getYCenter();
-
-        assert(((int) yCenter) == wy);
-
         final double yWidth = fit.peak.getYWidth();
         for (int i=(yc - wy); i <= (yc + wy); i++) {
             final double yt = ((double) i) - yCenter;
@@ -389,18 +385,18 @@ public class MultiFit {
     }
 
     private void subtractPeak(FitPeak fit) {
-        int wx = fit.wx;
-        int wy = fit.wy;
+        final int wx = fit.wx;
+        final int wy = fit.wy;
 
         // gaussian function
-        int offset = fit.offset;
-        double background = fit.peak.getBackground();
-        double height = fit.peak.getHeight();
+        final int offset = fit.offset;
+        final double background = fit.peak.getBackground();
+        final double height = fit.peak.getHeight();
         for (int i=-wy; i <= wy; i++) {
-            double eyt = fit.eyt[i + wy];
+            final double eyt = fit.eyt[i + wy];
             for (int j=-wx; j <= wx; j++) {
-                double ext = fit.ext[j + wx];
-                int idx = (i * this.imgSizeX) + (j + offset);
+                final double ext = fit.ext[j + wx];
+                final int idx = (i * this.imgSizeX) + (j + offset);
                 this.fgData[idx] -= height * eyt * ext;
                 this.bgData[idx] -= background;
                 this.bgCounts[idx] -= 1;
@@ -427,50 +423,49 @@ public class MultiFit {
                     hessian[i][4] = 0.0;
                 }
 
-                int offset = fit.offset;
-                int wx = fit.wx;
-                int wy = fit.wy;
+                final int offset = fit.offset;
+                final int wx = fit.wx;
+                final int wy = fit.wy;
 
-                double height = fit.peak.getHeight();
-                double xwidth = fit.peak.getXWidth();
-                double ywidth = fit.peak.getYWidth();
+                final double height = fit.peak.getHeight();
+                final double xwidth = fit.peak.getXWidth();
+                final double ywidth = fit.peak.getYWidth();
 
                 // calculate dwx vs z
-                double z0 = (fit.peak.getZCenter() - this.wxZParams[1]) /
-                             this.wxZParams[2];
+                final double zCenter = fit.peak.getZCenter();
+                double z0 = (zCenter - this.wxZParams[1]) / this.wxZParams[2];
                 double z1 = z0 * z0;
                 double z2 = z1 * z0;
                 double zt = (2.0 * z0) +
                             (3.0 * this.wxZParams[3] * z1) +
                             (4.0 * this.wxZParams[4] * z2);
-                double gx = -2.0 * zt / (this.wxZParams[0] * fit.wxTerm);
+                final double gx = -2.0 * zt / (this.wxZParams[0] * fit.wxTerm);
 
                 // calculate dwy vs z
-                z0 = (fit.peak.getZCenter() - this.wxZParams[1]) /
-                             this.wxZParams[2];
+                z0 = (zCenter - this.wyZParams[1]) / this.wyZParams[2];
                 z1 = z0 * z0;
                 z2 = z1 * z0;
                 zt = (2.0 * z0) +
                      (3.0 * this.wyZParams[3] * z1) +
                      (4.0 * this.wyZParams[4] * z2);
-                double gy = -2.0 * zt / (this.wyZParams[0] * fit.wxTerm);
+                final double gy = -2.0 * zt / (this.wyZParams[0] * fit.wyTerm);
 
                 for (int i=-wy; i < +wy; i++) {
 
-                   double yt = fit.yt[i + wy];
-                   double eyt = fit.eyt[i + wy];
+                   final double yt = fit.yt[i + wy];
+                   final double eyt = fit.eyt[i + wy];
 
                    for(int j=-wx; j < +wx; j++) {
 
-                       double xt = fit.xt[j + wx];
-                       double ext = fit.ext[j + wx];
+                       final double xt = fit.xt[j + wx];
+                       final double ext = fit.ext[j + wx];
 
-                       int idx = (i * this.imgSizeX) + (j + offset);
-                       double xi = this.imgData[idx];
-                       double fi = this.fgData[idx] / (this.bgData[idx] / ((double) this.bgCounts[idx]));
+                       final int idx = (i * this.imgSizeX) + (j + offset);
+                       final double xi = this.imgData[idx];
+                       final double fi = this.fgData[idx] / (this.bgData[idx] / ((double) this.bgCounts[idx]));
 
                        // first derivatives
-                       double et = ext * eyt;
+                       final double et = ext * eyt;
                        jt[0] = et;
                        jt[1] = 2.0 * height * xwidth * xt * et;
                        jt[2] = 2.0 * height * ywidth * yt * et;
@@ -478,7 +473,7 @@ public class MultiFit {
                        jt[4] = 1.0;
 
                        // calculate jacobian
-                       double t1 = 2.0 * (1.0 - xi/fi);
+                       final double t1 = 2.0 * (1.0 - xi/fi);
                        jacobian[0] += t1*jt[0];
                        jacobian[1] += t1*jt[1];
                        jacobian[2] += t1*jt[2];
@@ -486,7 +481,7 @@ public class MultiFit {
                        jacobian[4] += t1*jt[4];
 
                        // calculate hessian
-                       double t2 = 2.0 * xi / (fi * fi);
+                       final double t2 = 2.0 * xi / (fi * fi);
 
                        // calculate hessian without second derivative terms.
                        hessian[0][0] += t2*jt[0]*jt[0];
@@ -516,7 +511,7 @@ public class MultiFit {
 
                // use lapack to solve Ax=B to calculate update vector;
                boolean error = false;
-               RealMatrix hessianMatrix = MatrixUtils.createRealMatrix(hessian);
+               final RealMatrix hessianMatrix = MatrixUtils.createRealMatrix(hessian);
                RealVector jacobianVector = MatrixUtils.createRealVector(jacobian);
                try {
                     MatrixUtils.solveUpperTriangularSystem(hessianMatrix, jacobianVector);
@@ -568,28 +563,28 @@ public class MultiFit {
                     hessian[i][5] = 0.0;
                 }
 
-                int offset = fit.offset;
-                int wx = fit.wx;
-                int wy = fit.wy;
-                double height = fit.peak.getHeight();
-                double xwidth = fit.peak.getXWidth();
-                double ywidth = fit.peak.getYWidth();
+                final int offset = fit.offset;
+                final int wx = fit.wx;
+                final int wy = fit.wy;
+                final double height = fit.peak.getHeight();
+                final double xwidth = fit.peak.getXWidth();
+                final double ywidth = fit.peak.getYWidth();
 
                 for (int i=-wy; i <= +wy; i++) {
-                    double yt = fit.yt[i + wy];
-                    double eyt = fit.eyt[i + wy];
+                    final double yt = fit.yt[i + wy];
+                    final double eyt = fit.eyt[i + wy];
 
                     for (int j=-wx; j <= +wx; j++) {
-                        double xt = fit.xt[j + wx];
-                        double ext = fit.ext[j + wx];
+                        final double xt = fit.xt[j + wx];
+                        final double ext = fit.ext[j + wx];
 
-                        int idx = (i * this.imgSizeX) + (j + offset);
+                        final int idx = (i * this.imgSizeX) + (j + offset);
 
-                        double xi = this.imgData[idx];
-                        double fi = this.fgData[idx] +
+                        final double xi = this.imgData[idx];
+                        final double fi = this.fgData[idx] +
                                 (this.bgData[idx] / ((double) this.bgCounts[idx]));
 
-                        double et = ext * eyt;
+                        final double et = ext * eyt;
                         jt[0] = et;
                         jt[1] = 2.0 * height * xwidth * xt * et;
                         jt[2] = -height * xt * xt * et;
@@ -598,7 +593,7 @@ public class MultiFit {
                         jt[5] = 1.0;
 
                         // calculate jacobian
-                        double t1 = 2.0 * (1.0 - xi / fi);
+                        final double t1 = 2.0 * (1.0 - xi / fi);
                         jacobian[0] += t1*jt[0];
                         jacobian[1] += t1*jt[1];
                         jacobian[2] += t1*jt[2];
@@ -607,7 +602,7 @@ public class MultiFit {
                         jacobian[5] += t1*jt[5];
 
                         // calculate hessian
-                        double t2 = 2.0 * xi / (fi * fi);
+                        final double t2 = 2.0 * xi / (fi * fi);
                                                                         // hessian without second derivative terms.
                         hessian[0][0] += t2*jt[0]*jt[0];
                         hessian[0][1] += t2*jt[0]*jt[1];
@@ -645,7 +640,7 @@ public class MultiFit {
 
                 // use lapack to solve Ax=B to calculate update vector;
                 boolean error = false;
-                RealMatrix hessianMatrix = MatrixUtils.createRealMatrix(hessian);
+                final RealMatrix hessianMatrix = MatrixUtils.createRealMatrix(hessian);
                 RealVector jacobianVector = MatrixUtils.createRealVector(jacobian);
                 try {
                     MatrixUtils.solveUpperTriangularSystem(hessianMatrix, jacobianVector);
@@ -691,26 +686,26 @@ public class MultiFit {
                     hessian[i][4] = 0.0;
                 }
 
-                int offset = fit.offset;
-                int wx = fit.wx;
-                int wy = fit.wy;
-                double height = fit.peak.getHeight();
-                double width = fit.peak.getXWidth();
+                final int offset = fit.offset;
+                final int wx = fit.wx;
+                final int wy = fit.wy;
+                final double height = fit.peak.getHeight();
+                final double width = fit.peak.getXWidth();
 
                 for (int i=-wy; i <= +wy; i++) {
-                    double yt = fit.yt[i + wy];
-                    double eyt = fit.eyt[i + wy];
+                    final double yt = fit.yt[i + wy];
+                    final double eyt = fit.eyt[i + wy];
 
                     for (int j=-wx; j <= +wx; j++) {
-                        double xt = fit.xt[j + wx];
-                        double ext = fit.ext[j + wx];
+                        final double xt = fit.xt[j + wx];
+                        final double ext = fit.ext[j + wx];
 
-                        int idx = (i * this.imgSizeX) + (j + offset);
-                        double xi = this.imgData[idx];
-                        double fi = this.fgData[idx] +
+                        final int idx = (i * this.imgSizeX) + (j + offset);
+                        final double xi = this.imgData[idx];
+                        final double fi = this.fgData[idx] +
                                 (this.bgData[idx] / ((double) this.bgCounts[idx]));
 
-                        double et = ext * eyt;
+                        final double et = ext * eyt;
                         jt[0] = et;
                         jt[1] = 2.0 * height * width * xt * et;
                         jt[2] = 2.0 * height * width * yt * et;
@@ -718,7 +713,7 @@ public class MultiFit {
                         jt[4] = 1.0;
 
                         // calculate jacobian
-                        double t1 = 2.0 * (1.0 - xi / fi);
+                        final double t1 = 2.0 * (1.0 - xi / fi);
                         jacobian[0] += t1*jt[0];
                         jacobian[1] += t1*jt[1];
                         jacobian[2] += t1*jt[2];
@@ -726,7 +721,7 @@ public class MultiFit {
                         jacobian[4] += t1*jt[4];
 
                         // calculate hessian
-                        double t2 = 2.0 * xi / (fi*fi);
+                        final double t2 = 2.0 * xi / (fi*fi);
 
                         // calculate hessian without second derivative terms.
                         // (symmetric upper triangular)
@@ -757,7 +752,7 @@ public class MultiFit {
 
                 // use lapack to solve Ax=B to calculate update vector;
                 boolean error = false;
-                RealMatrix hessianMatrix = MatrixUtils.createRealMatrix(hessian);
+                final RealMatrix hessianMatrix = MatrixUtils.createRealMatrix(hessian);
                 RealVector jacobianVector = MatrixUtils.createRealVector(jacobian);
 
                 try {

@@ -15,8 +15,8 @@ import java.util.Collections;
 public class Util {
 
     public static void printStats(final ArrayList<Peak> peaks) {
-        int[] stats = fitStats(peaks);
-        double total = (double) stats[3];
+        final int[] stats = fitStats(peaks);
+        final double total = (double) stats[3];
         System.out.format("%d good:%t%d bad:%t%d unconverged:%t%d total:%n",
                           stats[0] / total, stats[1] / total, stats[2] / total, (int) total);
     }
@@ -28,10 +28,10 @@ public class Util {
         assert(wxParams != null && wyParams != null);
         assert((wxParams.length == 5) &&
                (wxParams.length == wyParams.length));
-        double zx = (z - wxParams[1]) / wxParams[2];
-        double sx = 0.5 * wxParams[0] * Math.sqrt(1.0 + zx*zx + wxParams[3]*zx*zx*zx + wxParams[4]*zx*zx*zx*zx);
-        double zy = (z - wyParams[1]) / wyParams[2];
-        double sy = 0.5 * wyParams[0] * Math.sqrt(1.0 + zy*zy + wyParams[3]*zy*zy*zy + wyParams[4]*zy*zy*zy*zy);
+        final double zx = (z - wxParams[1]) / wxParams[2];
+        final double sx = 0.5 * wxParams[0] * Math.sqrt(1.0 + zx*zx + wxParams[3]*zx*zx*zx + wxParams[4]*zx*zx*zx*zx);
+        final double zy = (z - wyParams[1]) / wyParams[2];
+        final double sy = 0.5 * wyParams[0] * Math.sqrt(1.0 + zy*zy + wyParams[3]*zy*zy*zy + wyParams[4]*zy*zy*zy*zy);
         return new double[]{sx, sy};
     }
 
