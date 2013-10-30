@@ -331,7 +331,6 @@
                           :2d (.iter2D multi)
                           :3d (.iter3D multi)
                           :else (throw (Exception. "unrecognized fit method"))))]
-    (do
       (iter-fit)
       (loop [i 1]
         (when (and (> (.getNumUnconverged multi))
@@ -345,7 +344,7 @@
         (prn (str "Multi-fit converged in: " @num-iters " " (.getNumUnconverged multi))))
       [(.getResults multi)
        (.getForeground multi)
-       (.getResidual multi)])))
+       (.getResidual multi)]))
 
 (defn peak->oval
   [^Peak peak & {:keys [color] :or {color (:gray colors)}}]
